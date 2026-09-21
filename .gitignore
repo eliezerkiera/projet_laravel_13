@@ -25,3 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+// Ajoutez ceci à la fin de votre fichier .gitignore
+/.notes/
+/notes/
