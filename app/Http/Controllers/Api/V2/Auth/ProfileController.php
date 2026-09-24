@@ -180,6 +180,7 @@ class ProfileController extends Controller
 
     /**
      * Change authenticated user password after verifying current password.
+     * All other active sessions (tokens) are revoked so other devices are signed out.
      */
     public function changePassword(ChangePasswordRequest $request): JsonResponse
     {
@@ -189,6 +190,11 @@ class ProfileController extends Controller
         $user->forceFill([
             'password' => $request->password,
         ])->save();
+
+        // Revoke every token except the one used for this request
+        $currentTokenId = $request->user()->currentAccessToken()->id;
+
+        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
 
         return response()->json([
             'message' => __('auth.password_changed'),
