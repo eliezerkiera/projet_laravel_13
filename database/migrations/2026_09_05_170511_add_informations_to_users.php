@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->renameColumn('name','last_name');
+            $table->renameColumn('name', 'last_name');
             $table->string('first_name')->nullable();
             $table->unsignedBigInteger('language_id');
             $table->unsignedBigInteger('country_id');
@@ -27,7 +27,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->renameColumn('name','last_name');
+            $table->renameColumn('name', 'last_name');
             $table->string('first_name')->nullable();
             $table->unsignedBigInteger('language_id');
             $table->unsignedBigInteger('country_id');

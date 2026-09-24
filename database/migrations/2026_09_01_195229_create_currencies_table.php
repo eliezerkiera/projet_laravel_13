@@ -17,13 +17,13 @@ return new class extends Migration
             $table->string('name');                      // Franc CFA, Euro
             $table->string('symbol', 10)->nullable();    // €, $, ₣
             $table->string('symbol_position', 10)         // 'before' ou 'after' le montant
-                     ->default('after');
+                ->default('after');
             $table->unsignedTinyInteger('decimal_places') // Nombre de décimales (0, 2, 3)
-                        ->default(2);
+                ->default(2);
             $table->string('decimal_separator', 1)       // '.' ou ','
-                        ->default(',');
+                ->default(',');
             $table->string('thousands_separator', 1)     // ' ', '.', ','
-                        ->default(' ');
+                ->default(' ');
             $table->boolean('is_active')->default(true); // Activer/désactiver une devise
             $table->boolean('is_default')->default(false); // Devise par défaut du système
             $table->timestamps();

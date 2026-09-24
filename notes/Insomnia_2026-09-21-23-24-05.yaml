@@ -1,0 +1,404 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: projet_laravel_13
+meta:
+  id: wrk_a3622227b8404c178fe1371a5df61194
+  created: 1788882910722
+  modified: 1789202272843
+  description: ""
+collection:
+  - url: "{{ _.base_url }}/test"
+    name: Test
+    meta:
+      id: req_6ec9a9dce00041578eb72154f5dd0454
+      created: 1789217790495
+      modified: 1789217888300
+      isPrivate: false
+      description: ""
+      sortKey: -1789217790515
+    method: GET
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/register"
+    name: Register
+    meta:
+      id: req_3c92f40fc7d441029bfda0f48e0ea579
+      created: 1789218046209
+      modified: 1789260405334
+      isPrivate: false
+      description: ""
+      sortKey: -1789218046209
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "first_name": "Jean",
+          "last_name": "Dupont",
+          "email": "jean.dupont2@example.com",
+          "password": "Password123!",
+          "password_confirmation": "Password123!",
+          "language_id": 1,
+          "country_id": 1,
+          "device_name": "Insomnia Test"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/me"
+    name: Me
+    meta:
+      id: req_246bd68eb2174f50a1412b04030ecb89
+      created: 1789218229676
+      modified: 1790021721022
+      isPrivate: false
+      description: ""
+      sortKey: -1789218229676
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer 37|tkkYfl4teKA1nU1CHr51PpU3e0YaUcpwVgofvpoT5a77e0ff
+        description: ""
+        disabled: false
+    authentication:
+      type: none
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/refresh"
+    name: Refresh Token
+    meta:
+      id: req_415686c61fa14bca823e3003a2e5f9f4
+      created: 1789218488631
+      modified: 1790021539822
+      isPrivate: false
+      description: ""
+      sortKey: -1789218488631
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "device_name": "Insomnia Test"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: Authorization
+        value: Bearer 36|TfBiGs178AEhk54uJ8Jol6BGWqXH8GrTPGASkAOd8fa5a779
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/login"
+    name: Login
+    meta:
+      id: req_4b2f63b9bb2d463e8514650c9c34fc19
+      created: 1789218638464
+      modified: 1790027631965
+      isPrivate: false
+      description: ""
+      sortKey: -1789218638464
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "jean.dupont3@exemple.com",
+          "password": "NewPassword123!",
+          "device_name": "Insomnia Test"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/devices"
+    name: Devices list
+    meta:
+      id: req_e2f949db5a70481caa665a0799488bf2
+      created: 1789218768089
+      modified: 1790021787654
+      isPrivate: false
+      description: ""
+      sortKey: -1789218768089
+    method: GET
+    headers:
+      - name: Authorization
+        value: Bearer 41|r9AFmiCTHwCKYww87Rq1FmTduqfAcwQ1fKAU1YBz90640643
+        description: ""
+        disabled: false
+      - name: Accept
+        value: application/json
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/profile"
+    name: Update Profile
+    meta:
+      id: req_053b4cbbf8f741d1abb741bb9e5962ef
+      created: 1789218881967
+      modified: 1790022113343
+      isPrivate: false
+      description: ""
+      sortKey: -1789218881967
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "first_name": "Jean-Pierre-pzapap",
+          "last_name": "Dupont-rrrrr",
+        	"email": "jean.dupont3@exemple.com"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: Authorization
+        value: Bearer 41|r9AFmiCTHwCKYww87Rq1FmTduqfAcwQ1fKAU1YBz90640643
+        description: ""
+        disabled: false
+      - name: Accept
+        value: application/json
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/password"
+    name: Change Password
+    meta:
+      id: req_d7fdd2bbd3b74fe2824a08aba6f74460
+      created: 1789219001021
+      modified: 1790022129118
+      isPrivate: false
+      description: ""
+      sortKey: -1789219001021
+    method: PUT
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "current_password": "Password123!",
+          "password": "NewPassword123!",
+          "password_confirmation": "NewPassword123!"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: Authorization
+        value: Bearer 41|r9AFmiCTHwCKYww87Rq1FmTduqfAcwQ1fKAU1YBz90640643
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/forgot-password"
+    name: Forgot Password
+    meta:
+      id: req_63e93af5da2f4a498bde0ed6651ebd2b
+      created: 1789219118691
+      modified: 1790027393379
+      isPrivate: false
+      description: ""
+      sortKey: -1789219118691
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "jean.dupont2@example.com"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/logout"
+    name: Logout
+    meta:
+      id: req_25a825e3e23c4f52a14014441aa52d86
+      created: 1789219203487
+      modified: 1790027018370
+      isPrivate: false
+      description: ""
+      sortKey: -1789219203487
+    method: POST
+    headers:
+      - name: Authorization
+        value: Bearer 47|6ChVoxLDIJwGIiLNK6m143yFA6fQeZCbYFjpSkDV74ff0e9e
+        description: ""
+        disabled: false
+      - name: Accept
+        value: application/json
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ base_url }}/auth/account"
+    name: Delete Account
+    meta:
+      id: req_f573ba13ff944a8e937ae4221fef46ea
+      created: 1789219280537
+      modified: 1790023976316
+      isPrivate: false
+      description: ""
+      sortKey: -1789219280537
+    method: DELETE
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "password": "NewPassword123!"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: Authorization
+        value: Bearer 45|sNKsO9ZS9xcaEVmdvZXCO7BO7Icf1L6L3HoHFj398eac2a59
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/auth/email/verify-code"
+    name: Verify code
+    meta:
+      id: req_6bf6a5b1965e491ca7abd16403914673
+      created: 1789233412013
+      modified: 1790027227127
+      isPrivate: false
+      description: ""
+      sortKey: -1789233412013
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "jean.dupont2@example.com",
+          "code": "538777",
+          "device_name": "Insomnia Test"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base_url }}/auth/reset-password-with-code"
+    name: Forgot Password Change
+    meta:
+      id: req_e8de08f0f33244c98eb234357cba9826
+      created: 1790023535985
+      modified: 1790023773288
+      isPrivate: false
+      description: ""
+      sortKey: -1790023535985
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+          "email": "jean.dupont3@exemple.com",
+          "code": "140332",
+          "password": "NewPassword123!",
+          "password_confirmation": "NewPassword123!"
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_c06926c94c1d10d0689e5f5032259570f643caa7
+    created: 1789202274134
+    modified: 1789202274134
+environments:
+  name: Base Environment
+  meta:
+    id: env_c06926c94c1d10d0689e5f5032259570f643caa7
+    created: 1788882910768
+    modified: 1790021356428
+    isPrivate: false
+  data:
+    base_url: http://127.0.0.1:8000/api/v1
+    access_token: 35|sdlcayCwBCXOkHHNjI84VnvhTTRXV72EZOo1WbAfe6406820
+    refresh_token: 36|TfBiGs178AEhk54uJ8Jol6BGWqXH8GrTPGASkAOd8fa5a779

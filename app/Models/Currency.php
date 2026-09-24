@@ -9,8 +9,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 class Currency extends Model
 {
     use HasFactory;
-
-
     use SoftDeletes;
 
     protected $fillable = [
@@ -26,7 +24,7 @@ class Currency extends Model
     ];
 
     protected $casts = [
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
         'is_default' => 'boolean',
         'decimal_places' => 'integer',
     ];

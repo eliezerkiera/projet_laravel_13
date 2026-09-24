@@ -11,12 +11,9 @@ class Country extends Model
     use HasFactory;
     use SoftDeletes;
 
-
     public $timestamps = false;
 
-    public const DEFAULT_COUNTRY='bf';
-
-
+    public const DEFAULT_COUNTRY = 'bf';
 
     protected $fillable = [
         'code',
@@ -31,11 +28,11 @@ class Country extends Model
     ];
 
     protected $casts = [
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
 
-       public static function getDefault(): ?self
+    public static function getDefault(): ?self
     {
         return static::where('code', self::DEFAULT_COUNTRY)->first();
     }
@@ -55,17 +52,16 @@ class Country extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true)
-                     ->orderBy('sort_order');
+            ->orderBy('sort_order');
     }
 
     // URL complète du drapeau
     public function getFlagUrlAttribute(): ?string
     {
         return $this->flag_image
-            ? asset('storage/' . $this->flag_image)
+            ? asset('storage/'.$this->flag_image)
             : null;
     }
-
 
     public function users()
     {

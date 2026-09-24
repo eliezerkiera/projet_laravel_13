@@ -11,11 +11,7 @@ class Language extends Model
     use HasFactory;
     use SoftDeletes;
 
-
-
-    public const DEFAULT_LANGUAGE = "fr";
-
-
+    public const DEFAULT_LANGUAGE = 'fr';
 
     protected $fillable = [
         'code',
@@ -31,17 +27,15 @@ class Language extends Model
     ];
 
     protected $casts = [
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
         'is_default' => 'boolean',
         'sort_order' => 'integer',
     ];
-
 
     public static function getDefault(): ?self
     {
         return static::where('code', self::DEFAULT_LANGUAGE)->first();
     }
-
 
     public function countries()
     {
