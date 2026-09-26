@@ -36,6 +36,12 @@ class DeviceController extends Controller
 
         $token->delete();
 
+        // Revoke refresh tokens with the same device name
+        $request->user()
+            ->refreshTokens()
+            ->where('device_name', $token->name)
+            ->update(['revoked' => true]);
+
         return response()->json([
             'message' => __('auth.device_disconnected'),
         ]);
@@ -47,11 +53,18 @@ class DeviceController extends Controller
     public function destroyOthers(Request $request): JsonResponse
     {
         $currentTokenId = $request->user()->currentAccessToken()?->id;
+        $currentDeviceName = $request->user()->currentAccessToken()?->name;
 
         $request->user()
             ->tokens()
             ->where('id', '!=', $currentTokenId)
             ->delete();
+
+        // Revoke refresh tokens for other devices (keep current device's refresh token)
+        $request->user()
+            ->refreshTokens()
+            ->where('device_name', '!=', $currentDeviceName)
+            ->update(['revoked' => true]);
 
         return response()->json([
             'message' => __('auth.other_devices_disconnected'),
@@ -63,7 +76,17 @@ class DeviceController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        $currentDeviceName = $request->user()->currentAccessToken()?->name;
+
         $request->user()->currentAccessToken()?->delete();
+
+        // Revoke refresh token for the current device
+        if ($currentDeviceName) {
+            $request->user()
+                ->refreshTokens()
+                ->where('device_name', $currentDeviceName)
+                ->update(['revoked' => true]);
+        }
 
         return response()->json([
             'message' => __('auth.logged_out'),

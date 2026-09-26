@@ -47,6 +47,11 @@ return [
     'other_devices_disconnected' => 'All other devices have been disconnected successfully.',
     'device_not_found' => 'Device session not found.',
 
+    // Refresh Token
+    'token_refreshed' => 'Token refreshed successfully.',
+    'invalid_refresh_token' => 'The refresh token is invalid.',
+    'refresh_token_expired' => 'The refresh token has expired. Please log in again.',
+
     // Mail Notifications
     'mail' => [
         'subject' => 'Your Verification Code: :code',

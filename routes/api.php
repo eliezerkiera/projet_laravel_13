@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V2\Auth\DeviceController;
 use App\Http\Controllers\Api\V2\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V2\Auth\LoginController;
 use App\Http\Controllers\Api\V2\Auth\ProfileController;
+use App\Http\Controllers\Api\V2\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\V2\Auth\RegisterController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,6 +41,9 @@ Route::prefix('v2/auth')->group(function () {
 
         // Guest pending email confirmation (if disconnected)
         Route::post('/verify-pending-email', [ProfileController::class, 'verifyPendingEmailGuest'])->middleware('throttle:auth-otp-verification');
+
+        // Refresh Token (public endpoint - no auth required)
+        Route::post('/refresh', [RefreshTokenController::class, 'refresh'])->middleware('throttle:auth-api');
     });
 
     // -------------------------------------------------------------

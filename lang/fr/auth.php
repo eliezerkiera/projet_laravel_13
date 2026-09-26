@@ -47,6 +47,11 @@ return [
     'other_devices_disconnected' => 'Tous les autres appareils ont été déconnectés avec succès.',
     'device_not_found' => 'Session d\'appareil introuvable.',
 
+    // Refresh Token
+    'token_refreshed' => 'Jeton rafraîchi avec succès.',
+    'invalid_refresh_token' => 'Le jeton de rafraîchissement est invalide.',
+    'refresh_token_expired' => 'Le jeton de rafraîchissement a expiré. Veuillez vous reconnecter.',
+
     // Notifications email
     'mail' => [
         'subject' => 'Votre code de vérification : :code',

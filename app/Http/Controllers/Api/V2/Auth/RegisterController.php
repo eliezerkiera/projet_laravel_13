@@ -7,10 +7,12 @@ use App\Http\Requests\V2\RegisterCompleteRequest;
 use App\Http\Requests\V2\RegisterSendCodeRequest;
 use App\Http\Requests\V2\RegisterVerifyCodeRequest;
 use App\Http\Resources\V2\UserResource;
+use App\Models\RefreshToken;
 use App\Models\User;
 use App\Models\VerificationCode;
 use App\Services\OtpService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class RegisterController extends Controller
 {
@@ -94,11 +96,21 @@ class RegisterController extends Controller
         $deviceName = $request->device_name ?: 'Web/Mobile App';
         $token = $user->createToken($deviceName)->plainTextToken;
 
+        // Create refresh token (valid for 1 month)
+        $refreshToken = RefreshToken::create([
+            'user_id' => $user->id,
+            'token' => Str::random(64),
+            'device_name' => $deviceName,
+            'expires_at' => now()->addMonth(),
+            'revoked' => false,
+        ]);
+
         $user->load(['language', 'country']);
 
         return response()->json([
             'message' => __('auth.registration_completed'),
             'access_token' => $token,
+            'refresh_token' => $refreshToken->token,
             'token_type' => 'Bearer',
             'user' => new UserResource($user),
         ], 201);

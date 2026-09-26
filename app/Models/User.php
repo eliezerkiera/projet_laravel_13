@@ -78,6 +78,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the refresh tokens associated with this user.
+     */
+    public function refreshTokens(): HasMany
+    {
+        return $this->hasMany(RefreshToken::class);
+    }
+
+    /**
      * Get user's full name.
      */
     public function getFullNameAttribute(): string
