@@ -1,0 +1,2 @@
+- [x] mise en place de l'api
+- [ ] optimisation de l'api (mise en place d'un systeme de limitation du nombre de requete par exemple) 

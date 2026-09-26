@@ -14,36 +14,38 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v2/auth')->group(function () {
-    // -------------------------------------------------------------
-    // Registration Flow (3 steps with OTP)
-    // -------------------------------------------------------------
-    Route::post('/register/send-code', [RegisterController::class, 'sendCode']);
-    Route::post('/register/resend-code', [RegisterController::class, 'resendCode']);
-    Route::post('/register/verify-code', [RegisterController::class, 'verifyCode']);
-    Route::post('/register/complete', [RegisterController::class, 'complete']);
+    Route::middleware('throttle:auth-api')->group(function () {
+        // -------------------------------------------------------------
+        // Registration Flow (3 steps with OTP)
+        // -------------------------------------------------------------
+        Route::post('/register/send-code', [RegisterController::class, 'sendCode'])->middleware('throttle:auth-otp-request');
+        Route::post('/register/resend-code', [RegisterController::class, 'resendCode'])->middleware('throttle:auth-otp-request');
+        Route::post('/register/verify-code', [RegisterController::class, 'verifyCode'])->middleware('throttle:auth-otp-verification');
+        Route::post('/register/complete', [RegisterController::class, 'complete'])->middleware('throttle:auth-otp-verification');
 
-    // -------------------------------------------------------------
-    // Login & 2FA Flow
-    // -------------------------------------------------------------
-    Route::post('/login', [LoginController::class, 'login']);
-    Route::post('/login/resend-code', [LoginController::class, 'resendCode']);
-    Route::post('/login/verify-code', [LoginController::class, 'verifyCode']);
+        // -------------------------------------------------------------
+        // Login & 2FA Flow
+        // -------------------------------------------------------------
+        Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:auth-login');
+        Route::post('/login/resend-code', [LoginController::class, 'resendCode'])->middleware('throttle:auth-otp-request');
+        Route::post('/login/verify-code', [LoginController::class, 'verifyCode'])->middleware('throttle:auth-otp-verification');
 
-    // -------------------------------------------------------------
-    // Password Reset Flow (OTP)
-    // -------------------------------------------------------------
-    Route::post('/forgot-password/send-code', [ForgotPasswordController::class, 'sendCode']);
-    Route::post('/forgot-password/resend-code', [ForgotPasswordController::class, 'resendCode']);
-    Route::post('/forgot-password/verify-code', [ForgotPasswordController::class, 'verifyCode']);
-    Route::post('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword']);
+        // -------------------------------------------------------------
+        // Password Reset Flow (OTP)
+        // -------------------------------------------------------------
+        Route::post('/forgot-password/send-code', [ForgotPasswordController::class, 'sendCode'])->middleware('throttle:auth-otp-request');
+        Route::post('/forgot-password/resend-code', [ForgotPasswordController::class, 'resendCode'])->middleware('throttle:auth-otp-request');
+        Route::post('/forgot-password/verify-code', [ForgotPasswordController::class, 'verifyCode'])->middleware('throttle:auth-otp-verification');
+        Route::post('/forgot-password/reset', [ForgotPasswordController::class, 'resetPassword'])->middleware('throttle:auth-otp-verification');
 
-    // Guest pending email confirmation (if disconnected)
-    Route::post('/verify-pending-email', [ProfileController::class, 'verifyPendingEmailGuest']);
+        // Guest pending email confirmation (if disconnected)
+        Route::post('/verify-pending-email', [ProfileController::class, 'verifyPendingEmailGuest'])->middleware('throttle:auth-otp-verification');
+    });
 
     // -------------------------------------------------------------
     // Authenticated Endpoints (Sanctum)
     // -------------------------------------------------------------
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:auth-api'])->group(function () {
         // User Profile & Account Management
         Route::get('/me', [ProfileController::class, 'me']);
         Route::put('/profile', [ProfileController::class, 'update']);
