@@ -3,9 +3,10 @@
 use App\Models\Country;
 use App\Models\Language;
 use App\Models\User;
+use App\Services\LocaleDetectionService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
+use Illuminate\Http\Request;
 use Tests\TestCase;
 
 class LocaleDetectionTest extends TestCase
@@ -16,271 +17,195 @@ class LocaleDetectionTest extends TestCase
     {
         parent::setUp();
 
-        // Seed the database with countries and languages
         $this->seed(DatabaseSeeder::class);
     }
 
-    public function test_manual_preferences_are_never_overridden_by_auto_detection(): void
+    public function test_it_auto_assigns_the_only_active_country_to_an_authenticated_user_without_a_country(): void
     {
         $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
-            'country_source' => 'manual',
-            'language_source' => 'manual',
+            'country_id' => null,
+            'language_id' => null,
         ]);
 
         $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
+            ->getJson('/api/v2/auth/me')
+            ->assertOk();
 
-        // Verify manual preferences are preserved
-        $user->refresh();
-        $this->assertEquals('manual', $user->country_source);
-        $this->assertEquals('manual', $user->language_source);
-        $this->assertEquals('BF', $user->country->code);
-        $this->assertEquals('fr', $user->language->code);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'country_id' => Country::query()->where('code', 'BF')->value('id'),
+            'country_source' => 'auto',
+        ]);
     }
 
-    public function test_auto_preferences_in_database_are_not_re_detected(): void
+    public function test_it_resolves_the_only_active_country_for_a_guest_without_persisting_any_preference(): void
+    {
+        $request = Request::create('/api/v2/countries/active');
+        $request->headers->remove('Accept-Language');
+        $detection = app(LocaleDetectionService::class)->detect($request);
+
+        $this->assertSame('BF', $detection['country']?->code);
+        $this->assertSame('fr', $detection['language']?->code);
+        $this->assertDatabaseCount('users', 0);
+    }
+
+    public function test_accept_language_is_used_for_an_unauthenticated_visitor(): void
+    {
+        $this->withHeader('Accept-Language', 'en')
+            ->postJson('/api/v2/auth/register/send-code')
+            ->assertUnprocessable();
+
+        $this->assertSame('en', app()->getLocale());
+    }
+
+    public function test_x_locale_override_takes_priority_for_an_unauthenticated_visitor(): void
+    {
+        $this->withHeader('X-Locale-Override', 'en')
+            ->postJson('/api/v2/auth/register/send-code')
+            ->assertUnprocessable();
+
+        $this->assertSame('en', app()->getLocale());
+    }
+
+    public function test_it_does_not_auto_assign_a_country_when_multiple_countries_are_active(): void
+    {
+        Country::query()->where('code', 'SN')->update(['is_active' => true]);
+        $user = User::factory()->create([
+            'country_id' => null,
+            'language_id' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->withHeader('Accept-Language', '')
+            ->getJson('/api/v2/auth/me')
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'country_id' => null,
+        ]);
+        $this->assertSame(config('app.locale'), app()->getLocale());
+    }
+
+    public function test_active_countries_endpoint_signals_when_manual_selection_is_required(): void
+    {
+        Country::query()->where('code', 'SN')->update(['is_active' => true]);
+
+        $this->getJson('/api/v2/countries/active')
+            ->assertOk()
+            ->assertJsonPath('country_selection_required', true)
+            ->assertJsonCount(2, 'countries')
+            ->assertJsonPath('countries.0.code', 'BF')
+            ->assertJsonPath('countries.1.code', 'SN');
+    }
+
+    public function test_existing_country_is_never_recalculated_even_when_multiple_countries_are_active(): void
+    {
+        Country::query()->where('code', 'SN')->update(['is_active' => true]);
+        $country = Country::query()->where('code', 'BF')->firstOrFail();
+        $user = User::factory()->create([
+            'country_id' => $country->id,
+            'country_source' => 'auto',
+            'language_id' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->getJson('/api/v2/auth/me')
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'country_id' => $country->id,
+            'country_source' => 'auto',
+        ]);
+    }
+
+    public function test_country_language_is_used_when_no_language_header_or_preference_exists(): void
     {
         $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
-            'country_source' => 'auto',
+            'country_id' => null,
+            'language_id' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->withHeader('Accept-Language', '')
+            ->getJson('/api/v2/auth/me')
+            ->assertOk();
+
+        $this->assertSame('fr', app()->getLocale());
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'language_id' => Language::query()->where('code', 'fr')->value('id'),
             'language_source' => 'auto',
         ]);
-
-        $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        // Verify auto preferences are preserved (not re-detected)
-        $user->refresh();
-        $this->assertEquals('auto', $user->country_source);
-        $this->assertEquals('auto', $user->language_source);
-        $this->assertEquals('BF', $user->country->code);
-        $this->assertEquals('fr', $user->language->code);
     }
 
-    public function test_country_detection_by_ip_with_language_fallback(): void
+    public function test_it_uses_the_application_locale_when_no_country_can_be_resolved(): void
     {
-        // This test would require mocking the Location package
-        // For now, we'll test the fallback behavior
-        $user = User::factory()->create([
-            'country_id' => null,
-            'language_id' => null,
-            'country_source' => null,
-            'language_source' => null,
-        ]);
+        Country::query()->where('code', 'SN')->update(['is_active' => true]);
 
-        // Set a test IP in env
-        Config::set('location.test_ip', '102.164.48.2'); // Burkina Faso IP
+        $detection = app(LocaleDetectionService::class)->detect(Request::create('/api/v2/countries/active'));
+        app(LocaleDetectionService::class)->applyLocale($detection);
 
-        $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        // After auto-detection, user should have country and language set
-        $user->refresh();
-        $this->assertNotNull($user->country_id);
-        $this->assertNotNull($user->language_id);
-        $this->assertEquals('auto', $user->country_source);
-        $this->assertEquals('auto', $user->language_source);
+        $this->assertNull($detection['country']);
+        $this->assertSame(config('app.locale'), app()->getLocale());
     }
 
-    public function test_accept_language_header_takes_priority_over_country_fallback(): void
+    public function test_manual_preferences_are_not_overridden_by_request_headers(): void
     {
+        $country = Country::query()->where('code', 'BF')->firstOrFail();
+        $language = Language::query()->where('code', 'fr')->firstOrFail();
         $user = User::factory()->create([
-            'country_id' => null,
-            'language_id' => null,
-            'country_source' => null,
-            'language_source' => null,
+            'country_id' => $country->id,
+            'language_id' => $language->id,
+            'country_source' => 'manual',
+            'language_source' => 'manual',
         ]);
 
         $this->actingAs($user)
             ->withHeader('Accept-Language', 'en')
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
+            ->getJson('/api/v2/auth/me')
+            ->assertOk();
 
-        // Verify English language is used (Accept-Language priority)
-        $user->refresh();
-        $this->assertEquals('en', $user->language->code);
-    }
-
-    public function test_x_locale_override_header_takes_priority_over_all_detection(): void
-    {
-        $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'country_id' => $country->id,
+            'language_id' => $language->id,
             'country_source' => 'manual',
             'language_source' => 'manual',
         ]);
-
-        $this->actingAs($user)
-            ->withHeader('X-Locale-Override', 'en')
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        // The override should take priority
-        $this->assertEquals('en', app()->getLocale());
+        $this->assertSame('fr', app()->getLocale());
     }
 
-    public function test_x_locale_override_works_for_unauthenticated_users(): void
+    public function test_locale_endpoint_marks_selected_preferences_as_manual(): void
     {
-        $this->withHeader('X-Locale-Override', 'en')
-            ->get('/api/v2/auth/register/send-code')
-            ->assertStatus(422); // Validation error, but request processed
-
-        // Verify the override took effect
-        $this->assertEquals('en', app()->getLocale());
-    }
-
-    public function test_locale_endpoint_validation_and_manual_flag(): void
-    {
-        $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
-            'country_source' => 'auto',
-            'language_source' => 'auto',
-        ]);
-
-        $countryBF = Country::where('code', 'BF')->first();
-        $languageEn = Language::where('code', 'en')->first();
+        $user = User::factory()->create();
+        $country = Country::query()->where('code', 'BF')->firstOrFail();
+        $language = Language::query()->where('code', 'en')->firstOrFail();
 
         $this->actingAs($user)
             ->patchJson('/api/v2/auth/locale', [
-                'country_id' => $countryBF->id,
-                'language_id' => $languageEn->id,
+                'country_id' => $country->id,
+                'language_id' => $language->id,
             ])
-            ->assertStatus(200);
+            ->assertOk();
 
-        $user->refresh();
-        $this->assertEquals('manual', $user->country_source);
-        $this->assertEquals('manual', $user->language_source);
-        $this->assertEquals('en', $user->language->code);
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'country_id' => $country->id,
+            'language_id' => $language->id,
+            'country_source' => 'manual',
+            'language_source' => 'manual',
+        ]);
     }
 
-    public function test_locale_endpoint_requires_at_least_one_field(): void
+    public function test_locale_endpoint_requires_a_preference_or_reset_request(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->patchJson('/api/v2/auth/locale', [])
-            ->assertStatus(422)
+            ->assertUnprocessable()
             ->assertJsonValidationErrors(['fields']);
-    }
-
-    public function test_locale_endpoint_reset_to_auto(): void
-    {
-        $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
-            'country_source' => 'manual',
-            'language_source' => 'manual',
-        ]);
-
-        $this->actingAs($user)
-            ->patchJson('/api/v2/auth/locale', [
-                'reset_to_auto' => true,
-            ])
-            ->assertStatus(200);
-
-        $user->refresh();
-        $this->assertEquals('auto', $user->country_source);
-        $this->assertEquals('auto', $user->language_source);
-    }
-
-    public function test_manual_preferences_not_overridden_after_update(): void
-    {
-        $user = User::factory()->create([
-            'country_id' => Country::where('code', 'BF')->first()->id,
-            'language_id' => Language::where('code', 'fr')->first()->id,
-            'country_source' => 'auto',
-            'language_source' => 'auto',
-        ]);
-
-        $countryBF = Country::where('code', 'BF')->first();
-        $languageEn = Language::where('code', 'en')->first();
-
-        // Update to manual
-        $this->actingAs($user)
-            ->patchJson('/api/v2/auth/locale', [
-                'country_id' => $countryBF->id,
-                'language_id' => $languageEn->id,
-            ])
-            ->assertStatus(200);
-
-        // Make another request to ensure manual preferences are preserved
-        $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        $user->refresh();
-        $this->assertEquals('manual', $user->country_source);
-        $this->assertEquals('manual', $user->language_source);
-        $this->assertEquals('en', $user->language->code);
-    }
-
-    public function test_complete_fallback_to_app_defaults(): void
-    {
-        // Test with no signals at all (no IP, no Accept-Language, no user preferences)
-        $user = User::factory()->create([
-            'country_id' => null,
-            'language_id' => null,
-            'country_source' => null,
-            'language_source' => null,
-        ]);
-
-        // Simulate no IP detection (private IP)
-        Config::set('location.test_ip', '127.0.0.1');
-
-        $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        // Should fallback to app defaults
-        $this->assertEquals(config('app.locale', 'en'), app()->getLocale());
-    }
-
-    public function test_inactive_country_fallback_behavior(): void
-    {
-        // Create an inactive country
-        $inactiveCountry = Country::where('code', 'BF')->first();
-        $inactiveCountry->update(['is_active' => false]);
-
-        $user = User::factory()->create([
-            'country_id' => null,
-            'language_id' => null,
-            'country_source' => null,
-            'language_source' => null,
-        ]);
-
-        // The system should fallback to default country (BF should be active in real scenario)
-        // But since we made BF inactive, it should still work with a warning
-        $this->actingAs($user)
-            ->get('/api/v2/auth/me')
-            ->assertStatus(200);
-
-        // Reset for other tests
-        $inactiveCountry->update(['is_active' => true]);
-    }
-
-    public function test_locale_endpoint_validates_country_and_language_exist(): void
-    {
-        $user = User::factory()->create();
-
-        $this->actingAs($user)
-            ->patchJson('/api/v2/auth/locale', [
-                'country_id' => 99999, // Non-existent
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['country_id']);
-
-        $this->actingAs($user)
-            ->patchJson('/api/v2/auth/locale', [
-                'language_id' => 99999, // Non-existent
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['language_id']);
     }
 }

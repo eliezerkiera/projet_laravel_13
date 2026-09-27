@@ -4,6 +4,7 @@ namespace App\Http\Requests\V2;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class UpdateLocaleRequest extends FormRequest
 {
@@ -45,35 +46,9 @@ class UpdateLocaleRequest extends FormRequest
     /**
      * Configure the validator instance.
      */
-    protected function prepareForValidation(): void
+    public function withValidator(Validator $validator): void
     {
-        // Ensure reset_to_auto is boolean
-        $this->merge([
-            'reset_to_auto' => $this->boolean('reset_to_auto'),
-        ]);
-    }
-
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, ValidationRule|array<mixed>|string>
-     */
-    public function rules(): array
-    {
-        return [
-            'country_id' => ['nullable', 'exists:countries,id'],
-            'language_id' => ['nullable', 'exists:languages,id'],
-            'reset_to_auto' => ['nullable', 'boolean'],
-        ];
-    }
-
-    /**
-     * Configure the validator instance.
-     */
-    public function withValidator($validator): void
-    {
-        $validator->after(function ($validator) {
-            // At least one of country_id or language_id must be provided (unless reset_to_auto is true)
+        $validator->after(function (Validator $validator): void {
             if (! $this->boolean('reset_to_auto') && ! $this->filled('country_id') && ! $this->filled('language_id')) {
                 $validator->errors()->add('fields', 'At least one of country_id or language_id must be provided.');
             }

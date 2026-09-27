@@ -1,3 +1,10 @@
+## [2026-09-27] — Retrait de la géolocalisation IP des préférences de locale
+- La résolution du pays dépend désormais uniquement des préférences enregistrées ou du nombre de pays actifs, sans dépendance ni fallback IP.
+- Ajout de l’endpoint public de pays actifs afin que les clients puissent demander un choix manuel lorsque plusieurs pays sont disponibles.
+- Les tests et le guide de tests Insomnia couvrent la nouvelle cascade et les préférences manuelles.
+Migration : `2026_09_27_164400_make_user_locale_preferences_nullable.php`
+Fichiers : `app/Services/LocaleDetectionService.php`, `app/Http/Controllers/Api/V2/CountryController.php`, `database/migrations/2026_09_27_164400_make_user_locale_preferences_nullable.php`, `routes/api.php`, `tests/Feature/LocaleDetectionTest.php`, `testing-locale-api.md`
+
 ## [2026-09-27] — Implémentation du système de détection automatique de pays et langue
 - Ajout d'un système complet de détection automatique du pays et de la langue avec support des préférences manuelles.
 - Ajout des colonnes `country_source` et `language_source` sur la table `users` pour traçabilité manual/auto.

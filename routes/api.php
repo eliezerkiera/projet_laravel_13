@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V2\Auth\LoginController;
 use App\Http\Controllers\Api\V2\Auth\ProfileController;
 use App\Http\Controllers\Api\V2\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\V2\Auth\RegisterController;
+use App\Http\Controllers\Api\V2\CountryController;
 use App\Http\Controllers\Api\V2\User\LocaleController;
 use Illuminate\Support\Facades\Route;
 
@@ -68,3 +69,5 @@ Route::prefix('v2/auth')->group(function () {
         Route::patch('/locale', [LocaleController::class, 'update']);
     });
 });
+
+Route::get('v2/countries/active', [CountryController::class, 'index']);

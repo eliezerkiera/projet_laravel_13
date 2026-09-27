@@ -134,7 +134,7 @@ class DatabaseSeeder extends Seeder
                 'phone_code' => '+221',
                 'currency_id' => $xof->id,
                 'language_id' => $fr->id,
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 2,
             ],
             [
@@ -144,7 +144,7 @@ class DatabaseSeeder extends Seeder
                 'phone_code' => '+225',
                 'currency_id' => $xof->id,
                 'language_id' => $fr->id,
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 3,
             ],
             [
@@ -154,7 +154,7 @@ class DatabaseSeeder extends Seeder
                 'phone_code' => '+33',
                 'currency_id' => $eur->id,
                 'language_id' => $fr->id,
-                'is_active' => true,
+                'is_active' => false,
                 'sort_order' => 4,
             ],
         ];
