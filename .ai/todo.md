@@ -1,160 +1,150 @@
 # Contexte
 
-Je développe une API REST en Laravel (versionnée, actuellement en **V2**), consommée par une
-SPA web et une application mobile.
-Je veux implémenter un système de détection automatique du pays et de la langue de l'utilisateur
-à chaque requête, tout en permettant à l'utilisateur de modifier manuellement ce choix.
+On retire complètement la géolocalisation par IP du système de détection de langue/pays.
+Le pays n'est plus détecté automatiquement par IP : il doit être **choisi par l'utilisateur**
+via l'endpoint de modification manuelle déjà en place, sauf dans un cas particulier détaillé
+ci-dessous.
 
-Les modèles `Country` et `Language` existent déjà. Explore leur structure (migrations, fillable,
-relations) avant de commencer, et adapte-toi à l'existant plutôt que de le recréer.
+Cependant, l'architecture doit rester pensée pour évoluer vers plusieurs pays actifs dans
+le futur (voir section "Règle d'évolutivité" plus bas) — ne fais aucun choix qui suppose
+un seul pays de façon définitive.
 
-Explore aussi comment le versioning V2 est organisé dans le projet (namespaces de contrôleurs,
-préfixe de routes, structure de dossiers, etc.) et respecte cette convention pour tout nouveau
-code que tu ajoutes. Ne crée pas une structure différente du reste du projet.
+# Ce qu'il faut retirer
 
-## Contexte métier
+1. Toute référence à `stevebauman/location` (déjà non installé suite au conflit Guzzle,
+   mais vérifie qu'aucun code résiduel ne l'importe encore).
+2. Si une classe `IpGeolocationService` (ou équivalent) a été créée dans une itération
+   précédente, la supprimer, ainsi que ses tests associés.
+3. Toute la logique de géolocalisation IP dans `LocaleDetectionService` (résolution du pays
+   via IP), y compris le mécanisme `TEST_IP` s'il n'est plus utilisé ailleurs.
+4. Les tests qui couvraient spécifiquement la géolocalisation IP (mock HTTP, IP privée, etc.).
 
-- Le site est disponible **uniquement au Burkina Faso** pour l'instant, mais l'architecture
-  doit être pensée multi-pays dès maintenant (aucune valeur codée en dur, tout passe par
-  la table `countries`).
-- **Deux langues sont actives dès le lancement : français et anglais.** Le français est la
-  langue par défaut du Burkina Faso.
-- La gestion des devises (`currency_code`) est déjà en place — ne pas y toucher, ne pas
-  la dupliquer.
-- **Ne pas ajouter de gestion de timezone** — ce n'est pas un besoin actuel, ne pas l'inclure
-  dans les migrations ni dans la logique.
-- La table `countries` possède déjà un champ `language_id`, qui représente la langue par
-  défaut associée à un pays. Ce champ sert de fallback de langue quand le pays est connu
-  mais que la langue ne l'est pas explicitement (ex: `Accept-Language` absent ou sans match).
+# Nouvelle logique de résolution du pays
 
-## Préparer l'extension multi-pays future
+1. **Si l'utilisateur est authentifié et a déjà un `country_id` en base** (peu importe
+   manual ou auto) → utiliser cette valeur telle quelle, ne rien recalculer.
 
-- Ajouter une colonne `is_active` (booléen) sur `countries`, pour pouvoir activer/désactiver
-  un pays sans déploiement de code. Seul le Burkina Faso doit avoir `is_active = true`
-  dans le seeder initial ; les autres pays peuvent exister en base avec `is_active = false`
-  s'ils sont déjà seedés, ou ne pas exister du tout si aucun autre pays n'est en base
-  actuellement (à vérifier dans l'existant).
-- Décider (et me proposer, avec justification) du comportement quand la géolocalisation IP
-  détecte un visiteur venant d'un pays **non actif** : autoriser quand même l'accès avec un
-  pays/langue de fallback, ou renvoyer une information exploitable par le client pour afficher
-  un message du type "service non disponible dans votre pays" — sans bloquer techniquement
-  la requête (laisser cette décision de blocage au client/frontend, l'API ne doit que fournir
-  l'information `country.is_active` de façon fiable).
-- Ne jamais supposer qu'un pays n'a qu'une seule langue possible pour un utilisateur :
-  `country.language_id` est une valeur par **défaut**, jamais une contrainte. Un utilisateur
-  au Burkina Faso doit pouvoir choisir l'anglais, et inversement.
+2. **Si l'utilisateur est authentifié sans `country_id` en base, ou si c'est un visiteur
+   non authentifié** :
+   - Compter le nombre de pays actifs (`is_active = true`) dans la table `countries`.
+   - **S'il n'y en a qu'un seul** (cas actuel avec le Burkina Faso) → l'assigner
+     automatiquement, avec le flag de traçabilité "auto" pour un utilisateur authentifié
+     (pas de persistance pour un visiteur non authentifié, juste résolu pour la requête).
+   - **S'il y en a plusieurs** (cas futur, plusieurs pays actifs) → ne rien assigner
+     automatiquement. Le pays reste `null` tant que l'utilisateur ne l'a pas choisi
+     explicitement via l'endpoint de modification manuelle. Prévoir que l'API puisse
+     signaler cette situation au client (ex: un champ `country_selection_required: true`
+     dans la réponse ou une route dédiée `GET /api/v2/countries/active` que le client peut
+     appeler pour proposer un sélecteur de pays) — propose la solution que tu juges la plus
+     propre pour ce point, et explique ton choix.
 
-# Règle fondamentale : ne jamais écraser un choix manuel
+# Résolution de la langue (inchangée)
 
-Si l'utilisateur a déjà modifié manuellement sa langue et/ou son pays (via un endpoint dédié,
-voir plus bas), la détection automatique ne doit plus jamais recalculer ni écraser ces valeurs.
-Il faut donc distinguer clairement "valeur détectée automatiquement" de "valeur choisie par
-l'utilisateur".
+La logique de langue reste telle qu'implémentée précédemment, uniquement basée sur :
+1. Choix manuel déjà en base → respecté tel quel.
+2. Header `Accept-Language` matché avec la table `languages` (`fr`/`en`).
+3. Si aucun match, fallback sur `country.language_id` **si un pays a pu être résolu**
+   (voir logique ci-dessus). Si aucun pays n'a pu être résolu (cas multi-pays sans choix
+   utilisateur), fallback direct sur `config('app.locale')`.
+4. `X-Locale-Override` reste prioritaire sur tout le reste, y compris non authentifié.
 
-Propose la solution technique la plus propre pour ça (par exemple un booléen
-`locale_manually_set` sur `users`, ou deux colonnes de traçabilité séparées `country_source`
-/ `language_source` avec des valeurs `auto` / `manual`) — explique ton choix.
+# Règle d'évolutivité (important)
 
-# Architecture : un middleware unique + un service dédié
+Le jour où un deuxième pays sera activé (`is_active = true` sur une seconde ligne de
+`countries`), le comportement d'auto-assignation du point 2 doit s'arrêter **automatiquement**,
+sans modification de code — uniquement parce que le nombre de pays actifs en base sera
+passé de 1 à plusieurs. Vérifie bien que ta logique de comptage (`Country::where('is_active',
+true)->count()`) est faite de façon à ce que ce changement de comportement soit purement
+piloté par la donnée en base, jamais par une constante ou un `.env`.
 
-- Un seul middleware, `DetectLocale`, orchestration légère. Il ne fait qu'appeler un service
-  et laisser passer la requête.
-- Toute la logique (résolution auth/manual/auto, géoloc IP, parsing `Accept-Language`,
-  fallback pays→langue, fallback final) vit dans un service dédié, ex:
-  `App\Services\LocaleDetectionService`, injecté dans le middleware.
-- Ne pas splitter en deux middlewares séparés (un pour la langue, un pour le pays) : la langue
-  dépend du pays détecté (fallback), donc les deux sont couplés et doivent être résolus
-  ensemble dans le même service, dans le bon ordre.
-- Le service attache le résultat à la requête (ex: `$request->attributes->set('country', ...)`
-  et `app()->setLocale(...)`), consultable par les contrôleurs pour la durée de la requête.
+# Contraintes techniques inchangées
 
-# Cascade de détection
+- Ne jamais planter la requête si une étape échoue (try/catch, vérifications défensives).
+- Fonctionne pour requêtes authentifiées et non authentifiées.
+- Respecter la structure V2 et les conventions déjà en place dans le projet.
 
-À chaque requête :
+# Tests à mettre à jour
 
-1. **Utilisateur authentifié + choix manuel actif** (flag "manual" sur le champ concerné)
-   → utiliser tel quel, ne rien recalculer, ne rien écraser.
-
-2. **Utilisateur authentifié + valeurs déjà en base issues d'une détection auto précédente**
-   → ne pas re-détecter tant qu'une valeur existe déjà (éviter de changer la langue d'un
-   utilisateur qui voyage avec une IP différente sans l'avoir demandé). Re-détection
-   automatique uniquement si le champ est vide.
-
-3. **Visiteur non authentifié, ou utilisateur authentifié sans valeur en base** → détection
-   à la volée, sans persistance pour le visiteur non authentifié, avec persistance en base
-   (flag "auto") pour l'utilisateur authentifié :
-   a. **Pays** : géolocalisation par IP (package `stevebauman/location` ou équivalent que tu
-      juges meilleur — justifie si tu changes). Robuste aux IP privées en local/dev (fallback
-      propre, avec possibilité de forcer une IP de test via `.env`, ex: `TEST_IP=`).
-   b. **Langue** :
-      - Tenter de matcher le header `Accept-Language` avec une langue existante dans
-        `languages` (`fr` ou `en`).
-      - Si aucun match ou header absent → utiliser `country.language_id` du pays détecté
-        à l'étape (a).
-      - Si le pays n'a pas pu être détecté non plus → fallback sur `config('app.locale')`.
-
-4. Un override explicite via header custom `X-Locale-Override` (ex: `fr` ou `en`) doit
-   toujours être respecté en priorité sur la détection automatique, y compris pour un
-   visiteur non authentifié (utile pour un sélecteur de langue côté client avant connexion,
-   stocké côté client en localStorage/cookie/storage mobile et renvoyé à chaque requête).
-
-# Endpoint de modification manuelle (API V2)
-
-Créer un endpoint dans la V2 (adapter le chemin exact à la convention déjà utilisée dans
-le projet, ex: `PATCH /api/v2/user/locale`), permettant à l'utilisateur authentifié de définir
-explicitement son `country_id` et/ou `language_id`.
-
-- Validation : les IDs fournis doivent exister dans `countries` / `languages`. Si le pays
-  fourni a `is_active = false`, décider s'il faut rejeter ou accepter quand même la
-  préférence (proposer une position et justifier).
-- Au moins un des deux champs doit être fourni.
-- Positionner le flag de traçabilité sur "manual" pour le(s) champ(s) modifié(s).
-- Retourner la ressource utilisateur mise à jour (via API Resource si le projet en utilise
-  déjà pour la V2).
-- Proposer (ou justifier l'absence d') un moyen de revenir en mode auto
-  (ex: paramètre `reset_to_auto: true`).
-
-# Contraintes techniques
-
-- Jamais de crash si une étape de détection échoue (try/catch ou vérifications défensives) —
-  fallback par défaut de l'app en dernier recours.
-- Fonctionne pour requêtes authentifiées (vérifier Sanctum/Passport utilisé dans le projet)
-  et non authentifiées (pas de persistance dans ce cas, juste résolution pour la durée
-  de la requête).
-- Vérifier si le middleware doit être enregistré globalement ou par groupe de version,
-  selon la structure du kernel HTTP du projet — expliquer le choix retenu.
-
-# Seeders
-
-- Seeder (ou mise à jour du seeder existant) pour `languages` : au moins `fr` (français)
-  et `en` (anglais).
-- Seeder pour `countries` : au moins le Burkina Faso, avec `language_id` pointant vers `fr`
-  et `is_active = true`. Ne pas inventer d'autres pays si l'existant n'en contient pas déjà.
-
-# Ce que je veux en livrable
-
-1. Migration(s) : colonnes sur `users` (`country_id`, `language_id`, traçabilité manual/auto),
-   colonne `is_active` sur `countries` (si absente).
-2. Seeders `languages` (fr/en) et mise à jour du seeder `countries` (Burkina Faso actif).
-3. `LocaleDetectionService` avec toute la logique de cascade.
-4. Middleware unique `DetectLocale`, enregistré au bon endroit (justifier le choix).
-5. Endpoint V2 (contrôleur + form request + resource si applicable) pour la modification
-   manuelle du pays/langue.
-6. Tests (Pest ou PHPUnit selon le projet) couvrant au minimum :
-   - préférences manuelles → jamais écrasées par la détection automatique
-   - préférences auto déjà en base → pas de re-détection tant que la valeur existe
-   - détection pays par IP + fallback langue via `country.language_id`
-   - `Accept-Language` prioritaire sur le fallback pays quand disponible
-   - `X-Locale-Override` prioritaire sur toute détection, y compris non authentifié
-   - endpoint V2 : validation, flag "manual", non-écrasement ultérieur
-   - fallback complet (aucun signal) → valeurs par défaut de l'app
-   - pays détecté avec `is_active = false` → comportement conforme à ce qui est décidé
-7. Résumé final des fichiers créés/modifiés avec les commandes à lancer (migrations,
-   composer install si besoin).
+- Supprimer les tests liés à la géolocalisation IP.
+- Ajouter/adapter :
+  - un seul pays actif en base → auto-assigné à un utilisateur authentifié sans `country_id`
+  - un seul pays actif en base → auto-résolu (sans persistance) pour un visiteur non
+    authentifié
+  - plusieurs pays actifs en base → aucun pays auto-assigné, comportement conforme à ce
+    qui est décidé pour signaler le besoin de choix au client
+  - utilisateur avec `country_id` déjà en base (peu importe manual/auto) → jamais recalculé
+  - fallback langue via `country.language_id` toujours fonctionnel quand un pays est résolu
+  - fallback direct sur `config('app.locale')` quand aucun pays n'est résolu
 
 # Avant de coder
 
-Explore la structure du projet (modèles `Country`/`Language`, structure de `User`, middlewares
-existants, organisation exacte du versioning V2, package de géoloc déjà présent ou non,
-système d'auth utilisé, seeders existants) et pose-moi des questions si un point te semble
-ambigu plutôt que de supposer.
+Relis l'implémentation actuelle de `LocaleDetectionService`, du middleware `DetectLocale`
+et de l'endpoint de modification manuelle avant de faire les changements, pour identifier
+précisément ce qui doit être retiré et ce qui doit être adapté.
+
+
+# Ajout au prompt précédent : documentation de test API
+
+En complément de tout ce qui précède, je veux à la fin du travail un fichier Markdown
+dédié à la façon de tester manuellement les routes concernées avec un client HTTP comme
+**Insomnia** (ou Postman, la logique est la même).
+
+## Emplacement et nom
+
+Crée ce fichier à la racine du projet ou dans un dossier `docs/` s'il existe déjà dans
+le projet (vérifie la convention existante) — nomme-le par exemple `docs/testing-locale-api.md`.
+
+## Contenu attendu
+
+Le fichier doit expliquer, de façon claire et actionnable pour quelqu'un qui découvre
+le système :
+
+1. **Contexte rapide** : à quoi sert le système (détection langue/pays), et rappel des
+   deux headers clés à connaître pour les tests :
+   - `Accept-Language` (standard HTTP, utilisé pour la détection automatique de la langue)
+   - `X-Locale-Override` (header custom du projet, permet de forcer une langue/pays)
+
+2. **Comment tester chaque scénario de la cascade**, avec pour chacun :
+   - la requête à envoyer (méthode, URL, headers nécessaires, body si applicable)
+   - le comportement attendu en retour
+   - Scénarios à couvrir au minimum :
+     a. Visiteur non authentifié, premier appel, sans aucun header particulier
+        → comportement attendu selon le nombre de pays actifs en base.
+     b. Visiteur non authentifié avec `Accept-Language: en` ou `Accept-Language: fr`
+        → langue attendue en retour.
+     c. Visiteur non authentifié avec `X-Locale-Override` renseigné → override respecté.
+     d. Utilisateur authentifié sans préférence en base → assignation auto (si un seul
+        pays actif) ou pas d'assignation (si plusieurs pays actifs) — comment simuler
+        chaque cas (ex: quel compte de test utiliser, ou comment faire varier
+        `is_active` en base pour le test).
+     e. Utilisateur authentifié avec préférence manuelle déjà définie → vérifier que rien
+        n'est écrasé même en changeant les headers.
+     f. Appel à l'endpoint de modification manuelle (`PATCH /api/v2/user/locale` ou le
+        chemin réel retenu) : exemple de body JSON, réponse attendue, et comment vérifier
+        ensuite que la préférence est bien "verrouillée" (rejouer une requête avec un
+        `Accept-Language` différent et constater que rien ne change).
+     g. Si la route de liste des pays actifs a été créée (`GET /api/v2/countries/active`
+        ou équivalent) : comment l'appeler et à quoi doit ressembler la réponse.
+
+3. **Comment configurer l'authentification dans Insomnia** pour les scénarios qui
+   nécessitent un utilisateur connecté (rappelle quel mécanisme d'auth est utilisé dans
+   le projet — Sanctum/Passport — et comment obtenir un token de test : quel endpoint
+   de login appeler, comment l'ajouter ensuite dans les headers des requêtes suivantes,
+   ex: `Authorization: Bearer {token}`).
+
+4. **Un exemple concret de collection Insomnia** si possible : soit un export JSON minimal
+   que l'utilisateur peut importer directement dans Insomnia, soit à défaut une description
+   pas-à-pas de comment créer manuellement les requêtes (nom de la requête, méthode, URL,
+   headers, body) pour chacun des scénarios listés en point 2.
+
+5. **Note sur les données de test nécessaires** : quels comptes utilisateurs, quelles
+   lignes en base (`countries`, `languages`) doivent exister pour rejouer ces scénarios,
+   et comment les obtenir rapidement (seeder dédié aux tests, factory, ou commande artisan
+   à lancer).
+
+## Ton et niveau attendu
+
+Écris ce fichier pour quelqu'un qui connaît Laravel mais découvre ce système précis pour
+la première fois (par exemple un autre développeur qui rejoint le projet, ou un testeur
+non-développeur qui a besoin de suivre des étapes précises). Reste concret, avec des
+exemples copiables/collables plutôt que des explications abstraites.
