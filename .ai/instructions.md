@@ -13,7 +13,12 @@ Attends ma validation explicite avant d'exécuter le plan.
 Exception : corrections triviales à un seul fichier sans impact fonctionnel
 (typo, formatage, commentaire) — pas besoin de plan préalable.
 
-### 2. Mise à jour du changelog
+## 2. Pendant la modification
+
+- Commente les modifications importantes dans le code pour qu'une autre personne puisse se retrouver.
+- Les commentaires doivent etre en anglais.
+
+### 3. Mise à jour du changelog
 Après toute modification validée et terminée, ajoute une entrée en tête de
 `.ai/changelog.md` (pas à la fin) avec :
 - Date
