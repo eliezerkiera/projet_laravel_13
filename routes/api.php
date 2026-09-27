@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V2\Auth\LoginController;
 use App\Http\Controllers\Api\V2\Auth\ProfileController;
 use App\Http\Controllers\Api\V2\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\V2\Auth\RegisterController;
+use App\Http\Controllers\Api\V2\User\LocaleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -62,5 +63,8 @@ Route::prefix('v2/auth')->group(function () {
         Route::get('/devices', [DeviceController::class, 'index']);
         Route::delete('/devices/{id}', [DeviceController::class, 'destroy']);
         Route::delete('/devices', [DeviceController::class, 'destroyOthers']);
+
+        // Locale Management
+        Route::patch('/locale', [LocaleController::class, 'update']);
     });
 });

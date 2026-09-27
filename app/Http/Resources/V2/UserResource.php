@@ -37,6 +37,7 @@ class UserResource extends JsonResource
                     'code' => $this->country->code,
                     'name' => $this->country->name,
                     'phone_code' => $this->country->phone_code,
+                    'is_active' => $this->country->is_active,
                 ] : null;
             }),
             'created_at' => $this->created_at?->toISOString(),

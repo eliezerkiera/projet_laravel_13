@@ -1,3 +1,19 @@
+## [2026-09-27] — Implémentation du système de détection automatique de pays et langue
+- Ajout d'un système complet de détection automatique du pays et de la langue avec support des préférences manuelles.
+- Ajout des colonnes `country_source` et `language_source` sur la table `users` pour traçabilité manual/auto.
+- Création du service `LocaleDetectionService` avec cascade de détection (manual → auto existant → détection IP → fallbacks).
+- Création du middleware `DetectLocaleMiddleware` remplaçant l'ancien `SetLocaleMiddleware`.
+- Intégration du package `stevebauman/location` pour la géolocalisation IP (ajouté à composer.json sans installation).
+- Support du header `X-Locale-Override` pour override client-side de la langue.
+- Création de l'endpoint PATCH /api/v2/auth/locale pour la modification manuelle des préférences.
+- Support du paramètre `reset_to_auto` pour revenir en mode de détection automatique.
+- Gestion des pays inactifs avec fallback sur le pays par défaut et information client via `is_active`.
+- Ajout des tests Pest couvrant tous les scénarios de détection et de modification manuelle.
+- Mise à jour de `UserResource` pour inclure le champ `is_active` du pays.
+- Vérification que le Burkina Faso est bien configuré comme actif dans le seeder existant.
+Migration : `2026_09_27_093149_add_locale_source_to_users_table.php`
+Fichiers : `composer.json`, `database/migrations/2026_09_27_093149_add_locale_source_to_users_table.php`, `app/Models/User.php`, `app/Services/LocaleDetectionService.php`, `app/Http/Middleware/DetectLocaleMiddleware.php`, `bootstrap/app.php`, `app/Http/Requests/V2/UpdateLocaleRequest.php`, `app/Http/Controllers/Api/V2/User/LocaleController.php`, `routes/api.php`, `app/Http/Resources/V2/UserResource.php`, `tests/Feature/LocaleDetectionTest.php`
+
 ## [2026-09-26] — Implémentation du système de Refresh Token
 - Ajout d'un système de refresh token pour l'API v2 avec access token valide 1 jour et refresh token valide 1 mois.
 - Création de la table `refresh_tokens` et du modèle `RefreshToken` avec gestion de l'expiration et de la révocation.

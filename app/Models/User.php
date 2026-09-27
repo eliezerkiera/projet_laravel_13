@@ -28,6 +28,8 @@ class User extends Authenticatable
         'password',
         'language_id',
         'country_id',
+        'country_source',
+        'language_source',
     ];
 
     /**
@@ -83,6 +85,22 @@ class User extends Authenticatable
     public function refreshTokens(): HasMany
     {
         return $this->hasMany(RefreshToken::class);
+    }
+
+    /**
+     * Check if the user's country was set manually.
+     */
+    public function isCountryManual(): bool
+    {
+        return $this->country_source === 'manual';
+    }
+
+    /**
+     * Check if the user's language was set manually.
+     */
+    public function isLanguageManual(): bool
+    {
+        return $this->language_source === 'manual';
     }
 
     /**
