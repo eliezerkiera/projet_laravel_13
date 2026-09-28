@@ -1,3 +1,9 @@
+## [2026-09-28] — Création du guide de test final de l'API v2
+- Rassemblement des flux d'inscription, connexion, refresh token, pays actifs et préférences de locale dans un seul guide de validation.
+- Documentation finale des cas de réussite, d'erreur et de points de vigilance pour les tests manuels dans Insomnia/Postman.
+- Alignement du document avec la logique actuelle : routes `/api/v2/auth`, `/api/v2/countries/active`, `X-Locale-Override`, refresh token et validation de locale.
+Fichiers : `notes/test_auth_v2_final.md`, `.ai/changelog.md`
+
 ## [2026-09-27] — Retrait de la géolocalisation IP des préférences de locale
 - La résolution du pays dépend désormais uniquement des préférences enregistrées ou du nombre de pays actifs, sans dépendance ni fallback IP.
 - Ajout de l’endpoint public de pays actifs afin que les clients puissent demander un choix manuel lorsque plusieurs pays sont disponibles.
