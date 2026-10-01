@@ -1,3 +1,13 @@
+## [2026-10-01] — Création de la documentation OpenAPI de l'API v2
+- Analyse complète des routes, contrôleurs, requêtes et ressources de l'API v2 pour générer une documentation OpenAPI 3.0.
+- Documentation structurée par tags : Authentication, Profile, Devices, Locale, Countries.
+- Inclusion de tous les endpoints avec leurs méthodes HTTP, paramètres, corps de requête, et réponses.
+- Définition des schémas de données (User, Device, Country, Language) et des erreurs possibles.
+- Documentation des headers d'authentification (Bearer token) et de locale (X-Locale-Override, Accept-Language).
+- Couverture des endpoints publics (inscription, login, mot de passe oublié, refresh token, pays actifs) et authentifiés (profil, appareils, locale).
+- Conversion de la documentation YAML au format JSON pour une meilleure compatibilité avec les outils d'API.
+Fichiers : `openapi.yaml`, `openapi.json`, `.ai/changelog.md`
+
 ## [2026-09-28] — Création du guide de test final de l'API v2
 - Rassemblement des flux d'inscription, connexion, refresh token, pays actifs et préférences de locale dans un seul guide de validation.
 - Documentation finale des cas de réussite, d'erreur et de points de vigilance pour les tests manuels dans Insomnia/Postman.

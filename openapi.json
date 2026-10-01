@@ -1,0 +1,2015 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Laravel API v2",
+    "description": "API v2 for authentication, user management, and locale preferences.\n\n## Authentication\nThis API uses Sanctum Personal Access Tokens for authentication. Include the token in the Authorization header:\n```\nAuthorization: Bearer {access_token}\n```\n\n## Locale\nThe API supports locale detection through headers:\n- `X-Locale-Override`: Highest priority locale override\n- `Accept-Language`: Browser locale preference\n\nLocale priority: X-Locale-Override > Accept-Language > User preference > Active country language\n\n## Rate Limiting\nAPI endpoints are rate limited. Refer to specific endpoint documentation for limits.",
+    "version": "2.0.0",
+    "contact": {
+      "name": "API Support",
+      "email": "support@example.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api/v2",
+      "description": "Local development server"
+    },
+    {
+      "url": "https://api.example.com/api/v2",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User registration, login, and password management"
+    },
+    {
+      "name": "Profile",
+      "description": "User profile management"
+    },
+    {
+      "name": "Devices",
+      "description": "Connected devices and session management"
+    },
+    {
+      "name": "Locale",
+      "description": "User locale preferences"
+    },
+    {
+      "name": "Countries",
+      "description": "Active countries list"
+    }
+  ],
+  "paths": {
+    "/auth/register/send-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Send OTP code for registration",
+        "description": "Sends a 6-digit OTP verification code to the provided email address for registration purposes.",
+        "operationId": "sendRegistrationCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 255,
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP code sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register/resend-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Resend OTP code for registration",
+        "description": "Resends a fresh 6-digit OTP verification code to the provided email address.",
+        "operationId": "resendRegistrationCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 255,
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP code resent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register/verify-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Verify OTP code for registration",
+        "description": "Verifies the 6-digit OTP code and returns a temporary verification token required to complete registration.",
+        "operationId": "verifyRegistrationCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "code"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Code verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "verification_token": {
+                      "type": "string",
+                      "description": "Temporary token required for registration completion",
+                      "example": "abc123xyz789"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register/complete": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Complete registration",
+        "description": "Completes the user registration using the verification token. Creates the user account and returns access and refresh tokens.",
+        "operationId": "completeRegistration",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["verification_token", "first_name", "last_name", "password", "password_confirmation", "country_id", "language_id"],
+                "properties": {
+                  "verification_token": {
+                    "type": "string",
+                    "description": "Token received from verify-code endpoint",
+                    "example": "abc123xyz789"
+                  },
+                  "first_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "example": "John"
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "example": "Doe"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "Password123!"
+                  },
+                  "password_confirmation": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "Password123!"
+                  },
+                  "country_id": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "language_id": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "device_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "Name of the device being registered",
+                    "example": "iPhone 15"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registration completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your account has been registered successfully."
+                    },
+                    "access_token": {
+                      "type": "string",
+                      "description": "Sanctum personal access token",
+                      "example": "1|abc123xyz789"
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "Refresh token for token rotation",
+                      "example": "ref123xyz789"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "example": "Bearer"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Login with credentials",
+        "description": "Authenticates user credentials and initiates 2FA by sending an OTP code to the user's email.",
+        "operationId": "login",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "Password123!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Credentials verified, OTP code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Credentials verified. Please enter the verification code sent to your email."
+                    },
+                    "challenge_token": {
+                      "type": "string",
+                      "description": "Token required for OTP verification",
+                      "example": "challenge123xyz789"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pending email verification required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "You must verify your pending email address before logging in."
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    },
+                    "pending_email": {
+                      "type": "string",
+                      "example": "newemail@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many login attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login/resend-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Resend login OTP code",
+        "description": "Resends the 2FA OTP code for login. Can use either challenge_token or email.",
+        "operationId": "resendLoginCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "challenge_token": {
+                    "type": "string",
+                    "description": "Challenge token from login attempt",
+                    "example": "challenge123xyz789"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "Email address associated with the login attempt",
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP code resent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "challenge_token": {
+                      "type": "string",
+                      "example": "challenge123xyz789"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid token or email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login/verify-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Verify login OTP code",
+        "description": "Verifies the 2FA OTP code and generates access and refresh tokens.",
+        "operationId": "verifyLoginCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["challenge_token", "code"],
+                "properties": {
+                  "challenge_token": {
+                    "type": "string",
+                    "description": "Challenge token from login attempt",
+                    "example": "challenge123xyz789"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  },
+                  "device_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "Name of the device being logged in",
+                    "example": "iPhone 15"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Logged in successfully."
+                    },
+                    "access_token": {
+                      "type": "string",
+                      "example": "1|abc123xyz789"
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "example": "ref123xyz789"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "example": "Bearer"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid token, expired code, or too many attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many verification attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/send-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Send password reset OTP code",
+        "description": "Sends a 6-digit OTP code to the provided email for password reset.",
+        "operationId": "sendPasswordResetCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP code sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/resend-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Resend password reset OTP code",
+        "description": "Resends a fresh OTP code for password reset.",
+        "operationId": "resendPasswordResetCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OTP code resent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "A verification code has been sent to your email address."
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/verify-code": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Verify password reset OTP code",
+        "description": "Verifies the OTP code and returns a reset token required to complete password reset.",
+        "operationId": "verifyPasswordResetCode",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "code"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "user@example.com"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Code verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Password reset code verified successfully."
+                    },
+                    "reset_token": {
+                      "type": "string",
+                      "description": "Token required for password reset",
+                      "example": "reset123xyz789"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "user@example.com"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password/reset": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Reset password",
+        "description": "Resets the user password using the valid reset token. Revokes all existing sessions for security.",
+        "operationId": "resetPassword",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password", "password_confirmation"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Reset token from verify-code endpoint",
+                    "example": "reset123xyz789"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "NewPassword123!"
+                  },
+                  "password_confirmation": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "NewPassword123!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your password has been reset successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Refresh access token",
+        "description": "Refreshes the access token using a valid refresh token. Implements token rotation - the old refresh token is revoked and a new one is issued.",
+        "operationId": "refreshToken",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                  "refresh_token": {
+                    "type": "string",
+                    "description": "Valid refresh token",
+                    "example": "ref123xyz789"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Token refreshed successfully."
+                    },
+                    "access_token": {
+                      "type": "string",
+                      "example": "2|newabc123xyz789"
+                    },
+                    "refresh_token": {
+                      "type": "string",
+                      "description": "New refresh token (rotation)",
+                      "example": "newref123xyz789"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "example": "Bearer"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid, expired, or revoked refresh token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/verify-pending-email": {
+      "post": {
+        "tags": ["Authentication"],
+        "summary": "Verify pending email (guest)",
+        "description": "Allows guest verification of pending email address if user logged out before verifying.",
+        "operationId": "verifyPendingEmailGuest",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "code"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "newemail@example.com"
+                  },
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your email has been verified successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Profile"],
+        "summary": "Get current user profile",
+        "description": "Retrieves the authenticated user's profile information including language and country preferences.",
+        "operationId": "getProfile",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/profile": {
+      "put": {
+        "tags": ["Profile"],
+        "summary": "Update user profile",
+        "description": "Updates user profile fields. If email changes, initiates OTP verification to the new email address.",
+        "operationId": "updateProfile",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "first_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "example": "John"
+                  },
+                  "last_name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "example": "Doe"
+                  },
+                  "country_id": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "language_id": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 255,
+                    "example": "newemail@example.com"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Profile updated successfully."
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or email already taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/profile/verify-email": {
+      "post": {
+        "tags": ["Profile"],
+        "summary": "Verify email change",
+        "description": "Verifies the OTP code sent to the new email address and commits the email change.",
+        "operationId": "verifyEmailChange",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 6,
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your email has been verified successfully."
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or invalid code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/password": {
+      "put": {
+        "tags": ["Profile"],
+        "summary": "Change password",
+        "description": "Changes the authenticated user's password after verifying the current password. Revokes all other active sessions.",
+        "operationId": "changePassword",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["current_password", "password", "password_confirmation"],
+                "properties": {
+                  "current_password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "OldPassword123!"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "NewPassword123!"
+                  },
+                  "password_confirmation": {
+                    "type": "string",
+                    "minLength": 8,
+                    "format": "password",
+                    "example": "NewPassword123!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your password has been changed successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or incorrect current password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/account": {
+      "delete": {
+        "tags": ["Profile"],
+        "summary": "Delete account",
+        "description": "Soft deletes the authenticated user's account after password confirmation.",
+        "operationId": "deleteAccount",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password"],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "example": "Password123!"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Account deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Your account has been deleted successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error or incorrect password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/devices": {
+      "get": {
+        "tags": ["Devices"],
+        "summary": "List connected devices",
+        "description": "Lists all connected devices/sessions for the authenticated user.",
+        "operationId": "listDevices",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Devices listed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "devices": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Device"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Devices"],
+        "summary": "Disconnect all other devices",
+        "description": "Disconnects all other devices/sessions except the current active one.",
+        "operationId": "disconnectOtherDevices",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Other devices disconnected successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "All other devices have been disconnected successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/devices/{id}": {
+      "delete": {
+        "tags": ["Devices"],
+        "summary": "Disconnect specific device",
+        "description": "Disconnects a specific device/session by its token ID. Also revokes the associated refresh token.",
+        "operationId": "disconnectDevice",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Device/token ID",
+            "example": 2
+          },
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Device disconnected successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Device disconnected successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Device not found."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": ["Devices"],
+        "summary": "Logout",
+        "description": "Logs out from the current device session by deleting its access token and revoking the associated refresh token.",
+        "operationId": "logout",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logged out successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "You have been logged out successfully."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/locale": {
+      "patch": {
+        "tags": ["Locale"],
+        "summary": "Update locale preferences",
+        "description": "Updates the user's locale preferences (country and/or language). Can also reset to auto-detection mode.",
+        "operationId": "updateLocale",
+        "security": [{"bearerAuth": []}],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "country_id": {
+                    "type": "integer",
+                    "description": "ID of the selected country",
+                    "example": 1
+                  },
+                  "language_id": {
+                    "type": "integer",
+                    "description": "ID of the selected language",
+                    "example": 2
+                  },
+                  "reset_to_auto": {
+                    "type": "boolean",
+                    "description": "If true, resets locale preferences to auto-detection mode",
+                    "example": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Locale preferences updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Locale preferences updated successfully."
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    },
+                    "warning": {
+                      "type": "string",
+                      "description": "Warning if selected country is inactive",
+                      "example": "The selected country is currently inactive. Some features may be limited."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/countries/active": {
+      "get": {
+        "tags": ["Countries"],
+        "summary": "List active countries",
+        "description": "Lists all active countries available for selection with their associated languages.",
+        "operationId": "listActiveCountries",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AcceptLanguage"
+          },
+          {
+            "$ref": "#/components/parameters/LocaleOverride"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active countries listed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "country_selection_required": {
+                      "type": "boolean",
+                      "description": "Whether the user needs to manually select a country (true if multiple active countries)",
+                      "example": false
+                    },
+                    "countries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Country"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Sanctum Personal Access Token"
+      }
+    },
+    "parameters": {
+      "AcceptLanguage": {
+        "name": "Accept-Language",
+        "in": "header",
+        "description": "Browser locale preference (e.g., en, fr)",
+        "schema": {
+          "type": "string"
+        },
+        "example": "en"
+      },
+      "LocaleOverride": {
+        "name": "X-Locale-Override",
+        "in": "header",
+        "description": "Highest priority locale override",
+        "schema": {
+          "type": "string"
+        },
+        "example": "fr"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "first_name": {
+            "type": "string",
+            "example": "John"
+          },
+          "last_name": {
+            "type": "string",
+            "example": "Doe"
+          },
+          "full_name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "user@example.com"
+          },
+          "pending_email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true,
+            "example": "newemail@example.com"
+          },
+          "email_verified_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00.000000Z"
+          },
+          "language_id": {
+            "type": "integer",
+            "nullable": true,
+            "example": 1
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          },
+          "country_id": {
+            "type": "integer",
+            "nullable": true,
+            "example": 1
+          },
+          "country": {
+            "$ref": "#/components/schemas/CountryDetail"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00.000000Z"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00.000000Z"
+          }
+        }
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Device name",
+            "example": "iPhone 15"
+          },
+          "is_current": {
+            "type": "boolean",
+            "description": "Whether this is the current device",
+            "example": true
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00.000000Z"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2024-01-01T00:00:00.000000Z"
+          }
+        }
+      },
+      "Language": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "code": {
+            "type": "string",
+            "example": "en"
+          },
+          "name": {
+            "type": "string",
+            "example": "English"
+          }
+        }
+      },
+      "Country": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "code": {
+            "type": "string",
+            "example": "US"
+          },
+          "name": {
+            "type": "string",
+            "example": "United States"
+          },
+          "native_name": {
+            "type": "string",
+            "example": "United States"
+          },
+          "phone_code": {
+            "type": "string",
+            "example": "+1"
+          },
+          "language": {
+            "$ref": "#/components/schemas/Language"
+          }
+        }
+      },
+      "CountryDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "code": {
+            "type": "string",
+            "example": "US"
+          },
+          "name": {
+            "type": "string",
+            "example": "United States"
+          },
+          "phone_code": {
+            "type": "string",
+            "example": "+1"
+          },
+          "is_active": {
+            "type": "boolean",
+            "example": true
+          }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "The given data was invalid."
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "example": {
+              "email": ["The email field is required."],
+              "code": ["The code must be 6 characters."]
+            }
+          }
+        }
+      },
+      "UnauthorizedError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Unauthenticated."
+          }
+        }
+      },
+      "TooManyRequestsError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Too many attempts. Please try again later."
+          }
+        }
+      }
+    }
+  }
+}

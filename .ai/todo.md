@@ -1,7 +1,6 @@
-voici les differentes etapes du developpement de l'api:
-- premiere version de l'api `notes/test_auth_v2_api.md`
-- ajout des refresh tokens `notes/test_auth_v2_api_rt.md`
-- ajout de la detection du pays et de la langue `notes/test_locale_detection_api.md`
-- retrait  de la detection automatique du pays `notes/testing-locale-api.md`
+# Travai a faire
 
-peut tu me faire un document complet pour tester l'api finale dans un fichier `notes/test_auth_v2_final.md`. tu peux aussi lire les fichier qui te seront necessaire pour comprendre l'api.
+- analyse les routes, les controlleurs et tout ce qui te sera necessaire pour faire une documentation complete de l'API
+- Utilise OpenAPI
+- Tu peux aussi te servir du document `notes/test_auth_v2_final.md`
+- a la fin relis bien le fichier de documentation generé et verifie qu'il n'y a pas d'erreurs. Si il y a des erreurs corrige les

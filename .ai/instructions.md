@@ -35,3 +35,4 @@ Fichiers : `app/Models/Invoice.php`, `database/migrations/..._create_invoices_ta
 ​```
 
 Ne jamais réécrire ou supprimer les entrées précédentes — uniquement ajouter.
+Si tu ne comprend pas quelque chose pose des questions

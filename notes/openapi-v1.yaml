@@ -1,0 +1,1522 @@
+openapi: 3.0.3
+info:
+  title: Laravel API v2
+  version: 2.0.0
+  description: |
+    Complete API documentation for Laravel v2 authentication and user management system.
+
+    Features:
+    - OTP-based registration with email verification
+    - 2FA login with challenge tokens
+    - Password reset with OTP verification
+    - Refresh token rotation for enhanced security
+    - Profile management with email change verification
+    - Multi-device session management
+    - Locale preferences (country/language) with auto-detection
+    - Active countries listing
+
+    Base URL: `/api/v2`
+    Authentication: Bearer Token (Sanctum)
+
+servers:
+  - url: http://localhost:8000/api/v2
+    description: Local development server
+  - url: https://api.example.com/api/v2
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+tags:
+  - name: Authentication
+    description: Public authentication endpoints (registration, login, password reset)
+  - name: Profile
+    description: User profile and account management (authenticated)
+  - name: Devices
+    description: Connected devices and session management (authenticated)
+  - name: Locale
+    description: User locale preferences (country/language) (authenticated)
+  - name: Countries
+    description: Public countries listing
+
+paths:
+  /auth/register/send-code:
+    post:
+      tags:
+        - Authentication
+      summary: Send OTP code for registration
+      description: |
+        Initiates the registration process by sending a 6-digit OTP code to the provided email address.
+        The email must be unique and not already registered.
+      operationId: sendRegistrationCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP code sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/register/resend-code:
+    post:
+      tags:
+        - Authentication
+      summary: Resend OTP code for registration
+      description: Resends a fresh OTP code to the email address for registration.
+      operationId: resendRegistrationCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP code resent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/register/verify-code:
+    post:
+      tags:
+        - Authentication
+      summary: Verify OTP code for registration
+      description: |
+        Verifies the 6-digit OTP code and returns a temporary verification token.
+        This token is required to complete the registration process.
+      operationId: verifyRegistrationCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  verification_token:
+                    type: string
+                    description: Temporary token for completing registration
+                    example: abc123xyz789
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error or invalid/expired code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/register/complete:
+    post:
+      tags:
+        - Authentication
+      summary: Complete registration
+      description: |
+        Completes the registration process using the verification token.
+        Creates the user account and issues access and refresh tokens.
+      operationId: completeRegistration
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - verification_token
+                - first_name
+                - last_name
+                - password
+                - password_confirmation
+                - country_id
+                - language_id
+              properties:
+                verification_token:
+                  type: string
+                  description: Token received from verify-code endpoint
+                  example: abc123xyz789
+                first_name:
+                  type: string
+                  maxLength: 255
+                  example: John
+                last_name:
+                  type: string
+                  maxLength: 255
+                  example: Doe
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: Password123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: Password123!
+                country_id:
+                  type: integer
+                  description: ID of the country from active countries list
+                  example: 1
+                language_id:
+                  type: integer
+                  description: ID of the language
+                  example: 1
+                device_name:
+                  type: string
+                  maxLength: 255
+                  description: Name of the device being registered
+                  example: iPhone 15
+      responses:
+        '201':
+          description: Registration completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Your account has been registered successfully.
+                  access_token:
+                    type: string
+                    description: Sanctum personal access token
+                    example: "1|abcdefghijklmnopqrstuvwxyz"
+                  refresh_token:
+                    type: string
+                    description: Refresh token for token rotation
+                    example: xyz789abc456def123
+                  token_type:
+                    type: string
+                    example: Bearer
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Validation error or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with credentials
+      description: |
+        Authenticates user credentials and initiates 2FA by sending an OTP code.
+        Returns a challenge token required for the second authentication step.
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+      responses:
+        '200':
+          description: Credentials verified, OTP code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Credentials verified. Please enter the verification code sent to your email.
+                  challenge_token:
+                    type: string
+                    description: Token for verifying the OTP code
+                    example: challenge123token456
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '403':
+          description: Pending email verification required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Please verify your pending email address before logging in.
+                  email:
+                    type: string
+                    format: email
+                  pending_email:
+                    type: string
+                    format: email
+        '422':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/login/resend-code:
+    post:
+      tags:
+        - Authentication
+      summary: Resend 2FA login code
+      description: Resends the OTP code for login 2FA verification.
+      operationId: resendLoginCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                challenge_token:
+                  type: string
+                  description: Challenge token from login endpoint
+                  example: challenge123token456
+                email:
+                  type: string
+                  format: email
+                  description: Alternative to challenge_token
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP code resent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  challenge_token:
+                    type: string
+                    example: challenge123token456
+        '422':
+          description: Invalid challenge token or email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/login/verify-code:
+    post:
+      tags:
+        - Authentication
+      summary: Verify 2FA login code
+      description: |
+        Verifies the OTP code and completes the login process.
+        Issues access and refresh tokens upon successful verification.
+      operationId: verifyLoginCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challenge_token
+                - code
+              properties:
+                challenge_token:
+                  type: string
+                  description: Challenge token from login endpoint
+                  example: challenge123token456
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+                device_name:
+                  type: string
+                  maxLength: 255
+                  description: Name of the device being authenticated
+                  example: iPhone 15
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged in successfully.
+                  access_token:
+                    type: string
+                    example: "1|abcdefghijklmnopqrstuvwxyz"
+                  refresh_token:
+                    type: string
+                    example: xyz789abc456def123
+                  token_type:
+                    type: string
+                    example: Bearer
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Invalid token, expired code, or too many attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/forgot-password/send-code:
+    post:
+      tags:
+        - Authentication
+      summary: Send password reset code
+      description: Initiates password reset by sending an OTP code to the user's email.
+      operationId: sendPasswordResetCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP code sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/forgot-password/resend-code:
+    post:
+      tags:
+        - Authentication
+      summary: Resend password reset code
+      description: Resends the OTP code for password reset.
+      operationId: resendPasswordResetCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: OTP code resent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/forgot-password/verify-code:
+    post:
+      tags:
+        - Authentication
+      summary: Verify password reset code
+      description: Verifies the OTP code and returns a reset token.
+      operationId: verifyPasswordResetCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Code verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password reset code verified successfully.
+                  reset_token:
+                    type: string
+                    description: Token for completing password reset
+                    example: reset123token456
+                  email:
+                    type: string
+                    format: email
+                    example: user@example.com
+        '422':
+          description: Validation error or invalid code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/forgot-password/reset:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password
+      description: |
+        Resets the user's password using the valid reset token.
+        Revokes all existing sessions for security.
+      operationId: resetPassword
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+                - password_confirmation
+              properties:
+                token:
+                  type: string
+                  description: Reset token from verify-code endpoint
+                  example: reset123token456
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: NewPassword123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: NewPassword123!
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Your password has been reset successfully.
+        '422':
+          description: Validation error or invalid token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: |
+        Refreshes the access token using a valid refresh token.
+        Implements token rotation: the old refresh token is revoked and a new one is issued.
+      operationId: refreshToken
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: Valid refresh token
+                  example: xyz789abc456def123
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Token refreshed successfully.
+                  access_token:
+                    type: string
+                    example: "2|newaccesstokenxyz"
+                  refresh_token:
+                    type: string
+                    description: New refresh token (rotation)
+                    example: newrefresh789token456
+                  token_type:
+                    type: string
+                    example: Bearer
+                  user:
+                    $ref: '#/components/schemas/User'
+        '422':
+          description: Invalid, expired, or revoked refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/verify-pending-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify pending email (guest)
+      description: |
+        Allows verification of pending email address without authentication.
+        Used when user logs out before verifying email change.
+      operationId: verifyPendingEmailGuest
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: Pending email address
+                  example: newemail@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully.
+        '422':
+          description: Invalid code or no pending email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '429':
+          description: Too many requests (rate limited)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitError'
+
+  /auth/me:
+    get:
+      tags:
+        - Profile
+      summary: Get current user profile
+      description: Retrieves the authenticated user's profile information with country and language details.
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /auth/profile:
+    put:
+      tags:
+        - Profile
+      summary: Update user profile
+      description: |
+        Updates user profile information. If email is changed, initiates OTP verification to the new email.
+        Email change requires separate verification via verify-email endpoint.
+      operationId: updateProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  maxLength: 255
+                  example: John
+                last_name:
+                  type: string
+                  maxLength: 255
+                  example: Doe
+                country_id:
+                  type: integer
+                  description: ID of the country
+                  example: 1
+                language_id:
+                  type: integer
+                  description: ID of the language
+                  example: 1
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  description: New email address (triggers OTP verification)
+                  example: newemail@example.com
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully.
+                  user:
+                    $ref: '#/components/schemas/User'
+        '200 (email changed)':
+          description: Email change initiated, OTP sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated. A verification code has been sent to your new email address.
+                  pending_email:
+                    type: string
+                    format: email
+                    example: newemail@example.com
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '422':
+          description: Validation error or email already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /auth/profile/verify-email:
+    post:
+      tags:
+        - Profile
+      summary: Verify email change
+      description: Verifies the OTP code sent to the new email address and commits the email change.
+      operationId: verifyEmailChange
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  pattern: '^[0-9]{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Email verified and changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Email verified successfully.
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '422':
+          description: Invalid code or no pending email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /auth/password:
+    put:
+      tags:
+        - Profile
+      summary: Change password
+      description: |
+        Changes the user's password after verifying the current password.
+        Revokes all other active sessions (tokens) for security.
+      operationId: changePassword
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - current_password
+                - password
+                - password_confirmation
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                  example: OldPassword123!
+                password:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: NewPassword123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  format: password
+                  example: NewPassword123!
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password changed successfully.
+        '401':
+          description: Unauthorized or invalid current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /auth/account:
+    delete:
+      tags:
+        - Profile
+      summary: Delete account
+      description: Soft deletes the user account after password confirmation. Revokes all tokens.
+      operationId: deleteAccount
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  format: password
+                  example: Password123!
+      responses:
+        '200':
+          description: Account deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Account deleted successfully.
+        '401':
+          description: Unauthorized or invalid password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /auth/devices:
+    get:
+      tags:
+        - Devices
+      summary: List connected devices
+      description: Lists all connected devices/sessions for the authenticated user.
+      operationId: listDevices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Devices listed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /auth/devices/{id}:
+    delete:
+      tags:
+        - Devices
+      summary: Disconnect specific device
+      description: Disconnects a specific device/session by its token ID.
+      operationId: disconnectDevice
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Device/session token ID
+          example: 2
+      responses:
+        '200':
+          description: Device disconnected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Device disconnected successfully.
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '404':
+          description: Device not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Device not found.
+
+  /auth/devices:
+    delete:
+      tags:
+        - Devices
+      summary: Disconnect all other devices
+      description: Disconnects all devices/sessions except the current active one.
+      operationId: disconnectOtherDevices
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Other devices disconnected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Other devices disconnected successfully.
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /auth/logout:
+    post:
+      tags:
+        - Devices
+      summary: Logout from current device
+      description: Logs out from the current device by deleting its access token and revoking the refresh token.
+      operationId: logout
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully.
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+
+  /auth/locale:
+    patch:
+      tags:
+        - Locale
+      summary: Update locale preferences
+      description: |
+        Updates the user's locale preferences (country and/or language).
+        Can reset to auto-detection mode or set manual preferences.
+      operationId: updateLocale
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                country_id:
+                  type: integer
+                  description: ID of the country
+                  example: 1
+                language_id:
+                  type: integer
+                  description: ID of the language
+                  example: 2
+                reset_to_auto:
+                  type: boolean
+                  description: Reset preferences to auto-detection mode
+                  example: false
+      responses:
+        '200':
+          description: Locale preferences updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Locale preferences updated successfully.
+                  user:
+                    $ref: '#/components/schemas/User'
+                  warning:
+                    type: string
+                    description: Warning if selected country is inactive
+                    example: The selected country is currently inactive. Some features may be limited.
+        '200 (reset to auto)':
+          description: Preferences reset to auto-detection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Locale preferences reset to auto-detection.
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnauthorizedError'
+        '422':
+          description: Validation error or no fields provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /countries/active:
+    get:
+      tags:
+        - Countries
+      summary: List active countries
+      description: |
+        Lists all active countries available for selection.
+        Respects locale headers (Accept-Language, X-Locale-Override) for response language.
+      operationId: listActiveCountries
+      security: []
+      parameters:
+        - name: Accept-Language
+          in: header
+          description: Preferred language (e.g., en, fr)
+          schema:
+            type: string
+            example: en
+        - name: X-Locale-Override
+          in: header
+          description: Override locale for this request (highest priority)
+          schema:
+            type: string
+            example: fr
+      responses:
+        '200':
+          description: Active countries listed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  country_selection_required:
+                    type: boolean
+                    description: Whether user needs to select a country (true if multiple active countries)
+                    example: false
+                  countries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Country'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Sanctum personal access token (format: "1|token")
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        full_name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        pending_email:
+          type: string
+          format: email
+          nullable: true
+          example: newemail@example.com
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2024-01-01T12:00:00Z
+        language_id:
+          type: integer
+          nullable: true
+          example: 1
+        language:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 1
+            code:
+              type: string
+              example: en
+            name:
+              type: string
+              example: English
+        country_id:
+          type: integer
+          nullable: true
+          example: 1
+        country:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 1
+            code:
+              type: string
+              example: US
+            name:
+              type: string
+              example: United States
+            phone_code:
+              type: string
+              example: +1
+            is_active:
+              type: boolean
+              example: true
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T12:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T12:00:00Z
+
+    Device:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Token ID
+          example: 1
+        name:
+          type: string
+          description: Device name
+          example: iPhone 15
+        is_current:
+          type: boolean
+          description: Whether this is the current device
+          example: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2024-01-01T12:00:00Z
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T12:00:00Z
+
+    Country:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: US
+        name:
+          type: string
+          example: United States
+        native_name:
+          type: string
+          example: United States
+        phone_code:
+          type: string
+          example: +1
+        language:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+              example: 1
+            code:
+              type: string
+              example: en
+            name:
+              type: string
+              example: English
+
+    Language:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: en
+        name:
+          type: string
+          example: English
+
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            email:
+              - The email field is required.
+            code:
+              - The code must be 6 characters.
+
+    UnauthorizedError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Unauthenticated.
+
+    RateLimitError:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Too many attempts. Please try again later.
