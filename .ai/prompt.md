@@ -1,2 +1,2 @@
 - lis le fichier `AGENTS.md` pour avoir le context si tu ne l'a pas deja fait
-- fais ce qui est dit dans le fichier `.ai/todo.md` en respectant aussi les instructions dans `.ai/instructions.md`
+- Lis `.ai/agent-prompts/00_contexte_commun.md` puis exécute `.ai/agent-prompts/01_tache_locale_pays.md` en respectant aussi les instructions dans `.ai/instructions.md`. Termine par le rapport demandé.
