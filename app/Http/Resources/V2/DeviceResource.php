@@ -14,13 +14,25 @@ class DeviceResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $currentTokenId = $request->user()?->currentAccessToken()?->id;
+        // Find the current access token to determine if this is the current device
+        $currentAccessToken = $request->user()?->currentAccessToken();
+        $currentFamilyId = null;
+
+        if ($currentAccessToken) {
+            // Find the refresh token for the current access token by device name
+            $currentRefreshToken = $request->user()
+                ->refreshTokens()
+                ->where('device_name', $currentAccessToken->name)
+                ->where('revoked', false)
+                ->first();
+            $currentFamilyId = $currentRefreshToken?->family_id;
+        }
 
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'is_current' => $currentTokenId === $this->id,
-            'last_used_at' => $this->last_used_at?->toISOString(),
+            'id' => $this->family_id ?? $this->id,
+            'name' => $this->device_name,
+            'is_current' => $currentFamilyId === $this->family_id,
+            'last_used_at' => $this->updated_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }

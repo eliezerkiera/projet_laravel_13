@@ -30,7 +30,15 @@ class LoginController extends Controller
             ->where('email', $request->email)
             ->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        // Anti-enumeration: always run hash check even if user doesn't exist
+        $passwordValid = $user ? Hash::check($request->password, $user->password) : false;
+
+        if (! $passwordValid) {
+            // Run hash check against dummy hash to equalize timing
+            if (! $user) {
+                Hash::check($request->password, '$2y$12$dummy.hash.for.timing.equalization');
+            }
+
             throw ValidationException::withMessages([
                 'email' => [__('auth.failed')],
             ]);
@@ -56,10 +64,15 @@ class LoginController extends Controller
         $challengeToken = Str::random(64);
         $verification->update(['token' => $challengeToken]);
 
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
+
         return response()->json([
             'message' => __('auth.login_otp_required'),
             'challenge_token' => $challengeToken,
             'email' => $user->email,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -109,9 +122,14 @@ class LoginController extends Controller
 
         $newVerification->update(['token' => $record->token]);
 
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
+
         return response()->json([
             'message' => __('auth.otp_sent'),
             'challenge_token' => $record->token,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -160,26 +178,40 @@ class LoginController extends Controller
         // Mark OTP as verified and consume it
         $otpService->consume($record);
 
-        // Issue Sanctum Personal Access Token
+        // Issue Sanctum Personal Access Token with explicit expiration
         $deviceName = $request->device_name ?: 'Web/Mobile App';
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 60);
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes($accessTokenTtl)
+        )->plainTextToken;
 
-        // Create refresh token (valid for 1 month)
+        // Create refresh token with family_id
+        $refreshTokenTtlDays = config('auth_api.refresh_token_ttl_days', 30);
+        $familyId = (string) Str::uuid();
         $refreshToken = RefreshToken::create([
             'user_id' => $user->id,
             'token' => Str::random(64),
             'device_name' => $deviceName,
-            'expires_at' => now()->addMonth(),
+            'expires_at' => now()->addDays($refreshTokenTtlDays),
             'revoked' => false,
+            'family_id' => $familyId,
         ]);
 
         $user->load(['language', 'country']);
+
+        // Calculate expires_in in seconds
+        $expiresIn = $accessTokenTtl * 60;
+        $refreshExpiresIn = $refreshTokenTtlDays * 24 * 60 * 60;
 
         return response()->json([
             'message' => __('auth.login_success'),
             'access_token' => $token,
             'refresh_token' => $refreshToken->token,
             'token_type' => 'Bearer',
+            'expires_in' => $expiresIn,
+            'refresh_expires_in' => $refreshExpiresIn,
             'user' => new UserResource($user),
         ]);
     }

@@ -22,11 +22,6 @@ class VerificationCode extends Model
     public const TYPE_EMAIL_CHANGE = 'email_change';
 
     /**
-     * Maximum allowed attempts before code invalidation.
-     */
-    public const MAX_ATTEMPTS = 5;
-
-    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -87,6 +82,6 @@ class VerificationCode extends Model
      */
     public function hasExceededAttempts(): bool
     {
-        return $this->attempts >= self::MAX_ATTEMPTS;
+        return $this->attempts >= config('auth_api.otp_max_attempts', 5);
     }
 }

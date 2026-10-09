@@ -1,3 +1,24 @@
+## [2026-10-09] — Cohérence, sécurité et prévisibilité de l'authentification (Tâche 02)
+- Configuration centralisée des durées et limites via `config/auth_api.php` avec variables d'environnement.
+- Ajout de `expires_in` et `refresh_expires_in` (en secondes) à toutes les réponses de token (register, login, refresh).
+- Access tokens créés avec expiration explicite (60 min par défaut) au lieu de dépendre uniquement de la config Sanctum.
+- Refresh tokens : ajout de colonnes `family_id`, `revoked_reason`, `revoked_at`, `rotated_at` pour traçabilité.
+- Implémentation de la rotation atomique des refresh tokens avec lock pour éviter les courses.
+- Détection de réutilisation de refresh token avec révocation automatique de toute la famille.
+- Stabilisation de l'identité d'appareil : utilisation de `family_id` comme identifiant stable dans `GET /devices`.
+- Flux OTP : ajout de `expires_in` et `resend_available_in` aux réponses d'envoi/renvoi.
+- Correction du message de `register/verify-code` pour confirmer la vérification (au lieu de "code envoyé").
+- Anti-énumération implémenté sur login (timing equalization), forgot-password (même réponse pour email existant/inexistant), register (pas d'OTP si compte existe).
+- Nouveaux limiteurs nommés : `otp-send`, `otp-verify`, `login`, `refresh`, `sensitive` avec valeurs configurables.
+- Révocation de sessions : changement de mot de passe révoque tous les autres appareils (access + refresh).
+- Reset de mot de passe révoque tous les tokens de l'utilisateur.
+- Suppression de compte exige le mot de passe actuel et révoque tous les tokens + codes OTP.
+- Création de la classe d'exception `ApiException` et handlers dans `bootstrap/app.php` pour les erreurs 4xx avec `code` stable.
+- Ajout du champ `code` (snake_case) à toutes les erreurs API : `unauthenticated`, `validation_failed`, `credentials_invalid`, `otp_invalid`, `otp_expired`, `otp_attempts_exceeded`, `verification_token_invalid`, `challenge_token_invalid`, `reset_token_invalid`, `refresh_token_invalid`, `refresh_token_expired`, `password_current_incorrect`, `device_not_found`, `resource_not_found`, `too_many_requests`.
+- Header `Retry-After` ajouté aux réponses 429 avec `retry_after` dans le corps JSON.
+Migration : `2026_10_09_230956_add_revocation_tracking_to_refresh_tokens_table.php`
+Fichiers : `config/auth_api.php`, `.env.example`, `app/Services/OtpService.php`, `app/Models/VerificationCode.php`, `app/Models/RefreshToken.php`, `app/Http/Controllers/Api/V2/Auth/{RefreshTokenController,LoginController,RegisterController,ForgotPasswordController,ProfileController,DeviceController}.php`, `app/Http/Resources/V2/DeviceResource.php`, `app/Exceptions/ApiException.php`, `bootstrap/app.php`, `app/Providers/AppServiceProvider.php`, `routes/api.php`, `lang/en/auth.php`, `database/migrations/2026_10_09_230956_add_revocation_tracking_to_refresh_tokens_table.php`, `docs/api/audit_auth_v2.md`
+
 ## [2026-10-09] — Refonte complète de la gestion de la langue et du pays (Tâche 01)
 - Refonte du système de détection locale : création de `LocaleResolver` et `LocaleContext` pour une résolution sans effets de bord.
 - Correction de l'hypothèse H1 : le profil utilisateur est désormais respecté via `user('sanctum')` dans le resolver.

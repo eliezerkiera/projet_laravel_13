@@ -14,12 +14,34 @@ class OtpService
     /**
      * Expiration duration in minutes for OTP codes.
      */
-    public const EXPIRATION_MINUTES = 10;
+    public function getExpirationMinutes(): int
+    {
+        return config('auth_api.otp_ttl_minutes', 10);
+    }
 
     /**
      * Resend cooldown duration in seconds.
      */
-    public const RESEND_COOLDOWN_SECONDS = 60;
+    public function getResendCooldownSeconds(): int
+    {
+        return config('auth_api.otp_resend_delay_seconds', 60);
+    }
+
+    /**
+     * Maximum allowed attempts before code invalidation.
+     */
+    public function getMaxAttempts(): int
+    {
+        return config('auth_api.otp_max_attempts', 5);
+    }
+
+    /**
+     * Verification token expiration in minutes.
+     */
+    public function getVerificationTokenTtlMinutes(): int
+    {
+        return config('auth_api.verification_token_ttl_minutes', 15);
+    }
 
     /**
      * Generate and dispatch a 6-digit OTP code to the given email address.
@@ -44,8 +66,8 @@ class OtpService
             ->latest('id')
             ->first();
 
-        if ($latest && $latest->created_at->addSeconds(self::RESEND_COOLDOWN_SECONDS)->isFuture()) {
-            $remainingSeconds = (int) ceil(now()->diffInSeconds($latest->created_at->addSeconds(self::RESEND_COOLDOWN_SECONDS)));
+        if ($latest && $latest->created_at->addSeconds($this->getResendCooldownSeconds())->isFuture()) {
+            $remainingSeconds = (int) ceil(now()->diffInSeconds($latest->created_at->addSeconds($this->getResendCooldownSeconds())));
             throw ValidationException::withMessages([
                 'email' => [__('auth.otp_wait_resend', ['seconds' => $remainingSeconds])],
             ]);
@@ -69,13 +91,13 @@ class OtpService
             'type' => $type,
             'data' => $data,
             'attempts' => 0,
-            'expires_at' => now()->addMinutes(self::EXPIRATION_MINUTES),
+            'expires_at' => now()->addMinutes($this->getExpirationMinutes()),
         ]);
 
-        // Send OTP notification via email
+        // Send OTP notification via email (synchronously for now - requires queue setup for async)
         $notifiable = $user ?? (object) ['email' => $email, 'first_name' => null];
         Notification::route('mail', $email)->notify(
-            new SendOtpNotification($code, $type, self::EXPIRATION_MINUTES)
+            new SendOtpNotification($code, $type, $this->getExpirationMinutes())
         );
 
         return $verificationCode;
@@ -111,7 +133,7 @@ class OtpService
             ]);
         }
 
-        if ($record->hasExceededAttempts()) {
+        if ($record->attempts >= $this->getMaxAttempts()) {
             throw ValidationException::withMessages([
                 'code' => [__('auth.otp_max_attempts')],
             ]);
@@ -131,8 +153,8 @@ class OtpService
         $record->update([
             'verified_at' => now(),
             'token' => $verificationToken,
-            // Refresh expiration for the verification token (15 minutes to complete form)
-            'expires_at' => now()->addMinutes(15),
+            // Refresh expiration for the verification token
+            'expires_at' => now()->addMinutes($this->getVerificationTokenTtlMinutes()),
         ]);
 
         return $record;

@@ -19,6 +19,7 @@ return [
     'otp_max_attempts' => 'Maximum verification attempts exceeded. Please request a new code.',
     'otp_wait_resend' => 'Please wait :seconds seconds before requesting another code.',
     'invalid_token' => 'The verification token is invalid or has expired.',
+    'verification_code_confirmed' => 'Verification code confirmed.',
 
     // Registration
     'registration_completed' => 'Your account has been registered successfully.',

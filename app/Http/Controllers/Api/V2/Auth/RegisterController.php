@@ -21,11 +21,33 @@ class RegisterController extends Controller
      */
     public function sendCode(RegisterSendCodeRequest $request, OtpService $otpService): JsonResponse
     {
+        // Anti-enumeration: check if account already exists
+        $existingUser = User::where('email', $request->email)->first();
+
+        if ($existingUser) {
+            // Don't send OTP, but return same response
+            // In production, send email informing that account exists
+            $expiresIn = $otpService->getExpirationMinutes() * 60;
+            $resendAvailableIn = $otpService->getResendCooldownSeconds();
+
+            return response()->json([
+                'message' => __('auth.otp_sent'),
+                'email' => $request->email,
+                'expires_in' => $expiresIn,
+                'resend_available_in' => $resendAvailableIn,
+            ]);
+        }
+
         $otpService->generateAndSend($request->email, VerificationCode::TYPE_REGISTER);
+
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
         return response()->json([
             'message' => __('auth.otp_sent'),
             'email' => $request->email,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -34,11 +56,32 @@ class RegisterController extends Controller
      */
     public function resendCode(RegisterSendCodeRequest $request, OtpService $otpService): JsonResponse
     {
+        // Anti-enumeration: check if account already exists
+        $existingUser = User::where('email', $request->email)->first();
+
+        if ($existingUser) {
+            // Don't send OTP, but return same response
+            $expiresIn = $otpService->getExpirationMinutes() * 60;
+            $resendAvailableIn = $otpService->getResendCooldownSeconds();
+
+            return response()->json([
+                'message' => __('auth.otp_sent'),
+                'email' => $request->email,
+                'expires_in' => $expiresIn,
+                'resend_available_in' => $resendAvailableIn,
+            ]);
+        }
+
         $otpService->generateAndSend($request->email, VerificationCode::TYPE_REGISTER);
+
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
         return response()->json([
             'message' => __('auth.otp_sent'),
             'email' => $request->email,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -53,10 +96,13 @@ class RegisterController extends Controller
             VerificationCode::TYPE_REGISTER
         );
 
+        $expiresIn = $otpService->getVerificationTokenTtlMinutes() * 60;
+
         return response()->json([
-            'message' => __('auth.otp_sent'), // code verified successfully
+            'message' => __('auth.verification_code_confirmed'),
             'verification_token' => $verification->token,
             'email' => $verification->email,
+            'expires_in' => $expiresIn,
         ]);
     }
 
@@ -73,6 +119,7 @@ class RegisterController extends Controller
 
         if (! $verification) {
             return response()->json([
+                'code' => 'verification_token_invalid',
                 'message' => __('auth.invalid_token'),
             ], 422);
         }
@@ -92,26 +139,40 @@ class RegisterController extends Controller
         // Invalidate the used token
         $otpService->consume($verification);
 
-        // Issue Sanctum Personal Access Token
+        // Issue Sanctum Personal Access Token with explicit expiration
         $deviceName = $request->device_name ?: 'Web/Mobile App';
-        $token = $user->createToken($deviceName)->plainTextToken;
+        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 60);
+        $token = $user->createToken(
+            $deviceName,
+            ['*'],
+            now()->addMinutes($accessTokenTtl)
+        )->plainTextToken;
 
-        // Create refresh token (valid for 1 month)
+        // Create refresh token with family_id
+        $refreshTokenTtlDays = config('auth_api.refresh_token_ttl_days', 30);
+        $familyId = (string) Str::uuid();
         $refreshToken = RefreshToken::create([
             'user_id' => $user->id,
             'token' => Str::random(64),
             'device_name' => $deviceName,
-            'expires_at' => now()->addMonth(),
+            'expires_at' => now()->addDays($refreshTokenTtlDays),
             'revoked' => false,
+            'family_id' => $familyId,
         ]);
 
         $user->load(['language', 'country']);
+
+        // Calculate expires_in in seconds
+        $expiresIn = $accessTokenTtl * 60;
+        $refreshExpiresIn = $refreshTokenTtlDays * 24 * 60 * 60;
 
         return response()->json([
             'message' => __('auth.registration_completed'),
             'access_token' => $token,
             'refresh_token' => $refreshToken->token,
             'token_type' => 'Bearer',
+            'expires_in' => $expiresIn,
+            'refresh_expires_in' => $refreshExpiresIn,
             'user' => new UserResource($user),
         ], 201);
     }

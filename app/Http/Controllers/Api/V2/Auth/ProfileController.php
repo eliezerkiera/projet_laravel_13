@@ -191,13 +191,25 @@ class ProfileController extends Controller
             'password' => $request->password,
         ])->save();
 
-        // Revoke every token except the one used for this request
+        // Revoke every access token except the one used for this request
         $currentTokenId = $request->user()->currentAccessToken()->id;
+        $currentDeviceName = $request->user()->currentAccessToken()->name;
 
-        $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+        $revokedCount = $user->tokens()->where('id', '!=', $currentTokenId)->delete();
+
+        // Revoke all refresh tokens except current device
+        $user->refreshTokens()
+            ->where('device_name', '!=', $currentDeviceName)
+            ->where('revoked', false)
+            ->update([
+                'revoked' => true,
+                'revoked_reason' => 'password_changed',
+                'revoked_at' => now(),
+            ]);
 
         return response()->json([
             'message' => __('auth.password_changed'),
+            'other_sessions_revoked' => $revokedCount,
         ]);
     }
 
@@ -209,14 +221,24 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        // Revoke all tokens
+        // Revoke all access tokens
         $user->tokens()->delete();
+
+        // Revoke all refresh tokens
+        $user->refreshTokens()->update([
+            'revoked' => true,
+            'revoked_reason' => 'account_deleted',
+            'revoked_at' => now(),
+        ]);
+
+        // Clean up OTP codes for this user
+        $user->verificationCodes()->delete();
 
         // Perform Soft Delete
         $user->delete();
 
         return response()->json([
-            'message' => __('auth.account_deleted'),
+            'message' => 'Your account has been deleted.',
         ]);
     }
 }

@@ -20,15 +20,24 @@ class ForgotPasswordController extends Controller
     {
         $user = User::where('email', $request->email)->first();
 
-        $otpService->generateAndSend(
-            $request->email,
-            VerificationCode::TYPE_PASSWORD_RESET,
-            $user
-        );
+        // Anti-enumeration: always return same response
+        // Only send OTP if user exists
+        if ($user) {
+            $otpService->generateAndSend(
+                $request->email,
+                VerificationCode::TYPE_PASSWORD_RESET,
+                $user
+            );
+        }
+
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
         return response()->json([
-            'message' => __('auth.otp_sent'),
+            'message' => 'If an account exists for this email, a verification code has been sent.',
             'email' => $request->email,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -39,15 +48,24 @@ class ForgotPasswordController extends Controller
     {
         $user = User::where('email', $request->email)->first();
 
-        $otpService->generateAndSend(
-            $request->email,
-            VerificationCode::TYPE_PASSWORD_RESET,
-            $user
-        );
+        // Anti-enumeration: always return same response
+        // Only send OTP if user exists
+        if ($user) {
+            $otpService->generateAndSend(
+                $request->email,
+                VerificationCode::TYPE_PASSWORD_RESET,
+                $user
+            );
+        }
+
+        $expiresIn = $otpService->getExpirationMinutes() * 60;
+        $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
         return response()->json([
-            'message' => __('auth.otp_sent'),
+            'message' => 'If an account exists for this email, a verification code has been sent.',
             'email' => $request->email,
+            'expires_in' => $expiresIn,
+            'resend_available_in' => $resendAvailableIn,
         ]);
     }
 
@@ -62,10 +80,13 @@ class ForgotPasswordController extends Controller
             VerificationCode::TYPE_PASSWORD_RESET
         );
 
+        $expiresIn = $otpService->getVerificationTokenTtlMinutes() * 60;
+
         return response()->json([
             'message' => __('auth.password_reset_code_verified'),
             'reset_token' => $verification->token,
             'email' => $verification->email,
+            'expires_in' => $expiresIn,
         ]);
     }
 
@@ -81,11 +102,20 @@ class ForgotPasswordController extends Controller
 
         if (! $verification) {
             return response()->json([
+                'code' => 'reset_token_invalid',
                 'message' => __('auth.invalid_token'),
             ], 422);
         }
 
-        $user = User::where('email', $verification->email)->firstOrFail();
+        $user = User::where('email', $verification->email)->first();
+
+        // Anti-enumeration: same response for non-existent email
+        if (! $user) {
+            return response()->json([
+                'code' => 'otp_invalid',
+                'message' => __('auth.otp_invalid'),
+            ], 422);
+        }
 
         // Update to new hashed password
         $user->forceFill([
@@ -94,6 +124,13 @@ class ForgotPasswordController extends Controller
 
         // Revoke all existing sessions for security
         $user->tokens()->delete();
+
+        // Revoke all refresh tokens
+        $user->refreshTokens()->update([
+            'revoked' => true,
+            'revoked_reason' => 'password_changed',
+            'revoked_at' => now(),
+        ]);
 
         // Consume the verification token
         $otpService->consume($verification);

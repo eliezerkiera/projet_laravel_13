@@ -18,6 +18,10 @@ class RefreshToken extends Model
         'device_name',
         'expires_at',
         'revoked',
+        'family_id',
+        'revoked_reason',
+        'revoked_at',
+        'rotated_at',
     ];
 
     /**
@@ -60,8 +64,42 @@ class RefreshToken extends Model
     /**
      * Revoke the refresh token.
      */
-    public function revoke(): void
+    public function revoke(?string $reason = null): void
     {
-        $this->update(['revoked' => true]);
+        $this->update([
+            'revoked' => true,
+            'revoked_reason' => $reason,
+            'revoked_at' => now(),
+        ]);
+    }
+
+    /**
+     * Mark the refresh token as rotated.
+     */
+    public function markAsRotated(): void
+    {
+        $this->update([
+            'revoked' => true,
+            'revoked_reason' => 'rotated',
+            'revoked_at' => now(),
+            'rotated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Revoke all refresh tokens in the same family.
+     */
+    public function revokeFamily(): void
+    {
+        if ($this->family_id) {
+            static::where('family_id', $this->family_id)
+                ->where('id', '!=', $this->id)
+                ->where('revoked', false)
+                ->update([
+                    'revoked' => true,
+                    'revoked_reason' => 'reuse_detected',
+                    'revoked_at' => now(),
+                ]);
+        }
     }
 }
