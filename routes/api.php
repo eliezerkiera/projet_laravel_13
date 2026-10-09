@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\V2\Auth\ProfileController;
 use App\Http\Controllers\Api\V2\Auth\RefreshTokenController;
 use App\Http\Controllers\Api\V2\Auth\RegisterController;
 use App\Http\Controllers\Api\V2\CountryController;
-use App\Http\Controllers\Api\V2\User\LocaleController;
+use App\Http\Controllers\Api\V2\LocaleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -29,7 +29,7 @@ Route::prefix('v2/auth')->group(function () {
         // -------------------------------------------------------------
         // Login & 2FA Flow
         // -------------------------------------------------------------
-        Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:auth-login');
+        Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:auth-login')->name('login');
         Route::post('/login/resend-code', [LoginController::class, 'resendCode'])->middleware('throttle:auth-otp-request');
         Route::post('/login/verify-code', [LoginController::class, 'verifyCode'])->middleware('throttle:auth-otp-verification');
 
@@ -64,10 +64,16 @@ Route::prefix('v2/auth')->group(function () {
         Route::get('/devices', [DeviceController::class, 'index']);
         Route::delete('/devices/{id}', [DeviceController::class, 'destroy']);
         Route::delete('/devices', [DeviceController::class, 'destroyOthers']);
-
-        // Locale Management
-        Route::patch('/locale', [LocaleController::class, 'update']);
     });
 });
 
-Route::get('v2/countries/active', [CountryController::class, 'index']);
+Route::prefix('v2')->group(function () {
+    // Public locale endpoint
+    Route::get('/locale', [LocaleController::class, 'show'])->name('v2.locale.show');
+
+    // Countries endpoint
+    Route::get('/countries/active', [CountryController::class, 'index']);
+
+    // Authenticated locale update endpoint
+    Route::middleware(['auth:sanctum', 'throttle:auth-api'])->patch('/locale', [LocaleController::class, 'update']);
+});

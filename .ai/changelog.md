@@ -1,3 +1,23 @@
+## [2026-10-09] — Refonte complète de la gestion de la langue et du pays (Tâche 01)
+- Refonte du système de détection locale : création de `LocaleResolver` et `LocaleContext` pour une résolution sans effets de bord.
+- Correction de l'hypothèse H1 : le profil utilisateur est désormais respecté via `user('sanctum')` dans le resolver.
+- Création de l'endpoint public `GET /api/v2/locale` exposant : langue/country résolus, sources, préférences brutes, langues/pays supportés.
+- Migration de `PATCH /api/v2/auth/locale` vers `PATCH /api/v2/locale` avec validation corrigée (detection de `null`, `has()` au lieu de `filled()`).
+- Suppression des colonnes `country_source` et `language_source` de la table `users` via nouvelle migration.
+- Fin de l'auto-persistance : aucune écriture en base pendant la détection.
+- Ajout de `Content-Language` sur toutes les réponses API (y compris erreurs 401, 404, 422).
+- Ajout du header `Vary: Accept-Language, X-Locale-Override, Authorization`.
+- Configuration CORS : `allowed_headers: ['*']`, `exposed_headers: ['Content-Language', 'Retry-After']`.
+- Traduction des messages via `__()` avec fichiers `lang/en/locale.php` et `lang/fr/locale.php`.
+- Alignement de `register/complete` : `country_id` requis uniquement si >1 pays actif.
+- Normalisation des codes de langue (minuscules, trim, partie avant `-`/`_`).
+- Priorité de résolution : override > profil > Accept-Language > pays > défaut.
+- Création de factories pour `Language`, `Country`, `Currency`.
+- Suppression de `LocaleDetectionService` et de l'ancien `LocaleController` (User\LocaleController).
+- Nommage de la route `login` pour Sanctum (évite les erreurs 500 de redirect).
+
+Fichiers : `app/Services/Locale/{LocaleContext,LocaleResolver}.php`, `app/Http/Controllers/Api/V2/LocaleController.php`, `app/Http/Resources/V2/LocaleResource.php`, `app/Http/Requests/V2/UpdateLocaleRequest.php`, `app/Http/Requests/V2/RegisterCompleteRequest.php`, `app/Http/Middleware/DetectLocaleMiddleware.php`, `app/Http/Controllers/Api/V2/CountryController.php`, `app/Models/User.php`, `database/migrations/2026_10_09_000000_remove_locale_source_columns_from_users_table.php`, `database/factories/{Language,Country,Currency}Factory.php`, `config/cors.php`, `routes/api.php`, `lang/{en,fr}/locale.php`, `tests/Feature/Api/V2/LocaleTest.php`
+
 ## [2026-10-01] — Création de la documentation OpenAPI de l'API v2
 - Analyse complète des routes, contrôleurs, requêtes et ressources de l'API v2 pour générer une documentation OpenAPI 3.0.
 - Documentation structurée par tags : Authentication, Profile, Devices, Locale, Countries.
