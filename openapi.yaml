@@ -1,0 +1,1777 @@
+openapi: 3.0.3
+info:
+  title: Laravel API v2
+  description: >-
+    API REST v2 pour l'authentification (Sanctum + Refresh Tokens avec
+    rotation), la gestion de profil, les appareils connectés et la détection /
+    sélection de la langue et du pays.
+
+
+    ### Principes Clés
+
+    - **Headers indispensables** : Toutes les requêtes doivent spécifier
+    `Accept: application/json`.
+
+    - **Langue & Pays** : `X-Locale-Override` (ex: `fr`, `en`, `ar`) est
+    recommandé sur toutes les requêtes pour forcer la langue souhaitée sans
+    modifier le profil utilisateur.
+
+    - **Gestion des Tokens** : Access token Sanctum (`expires_in = 3600s`) +
+    Refresh token maison (`refresh_expires_in = 2592000s`) avec rotation
+    atomique et détection de réutilisation frauduleuse.
+
+    - **Format d'Erreur Unifié** : Toutes les erreurs 4xx retournent un code
+    machine stable `code` (snake_case) et un message lisible `message`.
+  version: 2.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: Proprietary
+    url: https://opensource.org/licenses
+servers:
+  - url: /api/v2
+    description: API v2 Base URL (relative)
+tags:
+  - name: Authentication
+    description: >-
+      Inscription, connexion 2FA, mot de passe oublié, renvoi de code OTP et
+      refresh token
+  - name: Profile
+    description: >-
+      Consultation, modification du profil, validation de changement d'email,
+      mot de passe et suppression de compte
+  - name: Devices
+    description: Gestion des sessions actives et des appareils connectés (family_id stable)
+  - name: Locale
+    description: >-
+      Consultation du contexte de localisation et mise à jour des préférences
+      utilisateur
+  - name: Countries
+    description: Liste des pays actifs disponibles pour sélection
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum Token
+      description: Jeton d'accès personnel Sanctum (format `Bearer {access_token}`)
+  parameters:
+    XLocaleOverride:
+      name: X-Locale-Override
+      in: header
+      description: >-
+        Code de langue prioritaire pour surcharger la langue de réponse sans
+        persister en base (ex: `fr`, `en`, `ar`)
+      required: false
+      schema:
+        type: string
+        example: fr
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      description: 'Préférences linguistiques du client HTTP (ex: `fr,en;q=0.9`)'
+      required: false
+      schema:
+        type: string
+        example: fr-FR,fr;q=0.9,en;q=0.8
+  responses:
+    UnauthorizedError:
+      description: Authentification manquante, invalide ou expirée
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: unauthenticated
+            message: Unauthenticated.
+    NotFoundError:
+      description: Ressource ou session introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: resource_not_found
+            message: Resource not found.
+    ValidationError:
+      description: Données de formulaire ou de requête invalides
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            code: validation_failed
+            message: The email field is required.
+            errors:
+              email:
+                - The email field is required.
+    TooManyRequestsError:
+      description: Quota de requêtes dépassé (limiteur de débit)
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            example: 60
+          description: Nombre de secondes à attendre avant de pouvoir réessayer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimitErrorResponse'
+          example:
+            code: too_many_requests
+            message: Too many attempts. Please try again later.
+            retry_after: 60
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Identifiant machine stable de l'erreur en snake_case
+          example: unauthenticated
+        message:
+          type: string
+          description: Message informatif lisible pour l'humain
+          example: Unauthenticated.
+    ValidationErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - errors
+      properties:
+        code:
+          type: string
+          example: validation_failed
+        message:
+          type: string
+          example: The given data was invalid.
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          example:
+            email:
+              - The email field is required.
+            code:
+              - The verification code is invalid.
+    RateLimitErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: too_many_requests
+        message:
+          type: string
+          example: Too many attempts. Please try again later.
+        retry_after:
+          type: integer
+          nullable: true
+          description: Secondes restantes avant déblocage
+          example: 60
+    Language:
+      type: object
+      required:
+        - id
+        - code
+        - name
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: fr
+        name:
+          type: string
+          example: French
+    LanguageWithSource:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - source
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: fr
+        name:
+          type: string
+          example: French
+        source:
+          type: string
+          enum:
+            - override
+            - profile
+            - accept_language
+            - country
+            - default
+          description: Origine de la résolution de la langue
+          example: profile
+    Country:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - phone_code
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: BF
+        name:
+          type: string
+          example: Burkina Faso
+        native_name:
+          type: string
+          example: Burkina Faso
+        phone_code:
+          type: string
+          example: '+226'
+        language:
+          $ref: '#/components/schemas/Language'
+    CountryDetail:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - phone_code
+        - is_active
+        - source
+      properties:
+        id:
+          type: integer
+          example: 1
+        code:
+          type: string
+          example: BF
+        name:
+          type: string
+          example: Burkina Faso
+        native_name:
+          type: string
+          example: Burkina Faso
+        phone_code:
+          type: string
+          example: '+226'
+        is_active:
+          type: boolean
+          example: true
+        source:
+          type: string
+          enum:
+            - profile
+            - single_active
+            - none
+          example: profile
+        language:
+          $ref: '#/components/schemas/Language'
+    User:
+      type: object
+      required:
+        - id
+        - first_name
+        - last_name
+        - email
+      properties:
+        id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: Alice
+        last_name:
+          type: string
+          example: Dupont
+        full_name:
+          type: string
+          example: Alice Dupont
+        email:
+          type: string
+          format: email
+          example: alice@example.com
+        pending_email:
+          type: string
+          format: email
+          nullable: true
+          example: null
+        email_verified_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-10-09T23:49:56.000000Z'
+        language_id:
+          type: integer
+          nullable: true
+          example: 1
+        language:
+          $ref: '#/components/schemas/Language'
+        country_id:
+          type: integer
+          nullable: true
+          example: 1
+        country:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            code:
+              type: string
+              example: BF
+            name:
+              type: string
+              example: Burkina Faso
+            phone_code:
+              type: string
+              example: '+226'
+            is_active:
+              type: boolean
+              example: true
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-09T23:49:56.000000Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-10-09T23:49:56.000000Z'
+    AuthTokenResponse:
+      type: object
+      required:
+        - message
+        - access_token
+        - refresh_token
+        - token_type
+        - expires_in
+        - refresh_expires_in
+        - user
+      properties:
+        message:
+          type: string
+          example: Logged in successfully.
+        access_token:
+          type: string
+          description: Jeton d'accès Sanctum
+          example: 2|abc...
+        refresh_token:
+          type: string
+          description: Jeton de rafraîchissement à usage unique
+          example: r9T5nvAXjazh79xbahsv6aQUD02Z4ylwvIAi908c72a1...
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+          description: Durée de validité de l'access token en secondes (3600 = 1h)
+          example: 3600
+        refresh_expires_in:
+          type: integer
+          description: Durée de validité du refresh token en secondes (2592000 = 30 jours)
+          example: 2592000
+        user:
+          $ref: '#/components/schemas/User'
+    Device:
+      type: object
+      required:
+        - id
+        - name
+        - is_current
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identifiant stable de session (family_id)
+          example: 36a237e6-0023-44f4-8e78-b852be2b4594
+        name:
+          type: string
+          description: Nom de l'appareil
+          example: iPhone 15
+        is_current:
+          type: boolean
+          description: Indique s'il s'agit de la session de la requête courante
+          example: false
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-10-09T23:49:56.000000Z'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-10-09T23:49:56.000000Z'
+    LocaleContext:
+      type: object
+      required:
+        - country_selection_required
+        - preferences
+        - supported_languages
+        - countries
+      properties:
+        language:
+          $ref: '#/components/schemas/LanguageWithSource'
+        country:
+          $ref: '#/components/schemas/CountryDetail'
+        country_selection_required:
+          type: boolean
+          description: >-
+            Vaut true si plusieurs pays sont actifs et qu'aucun pays n'est
+            sélectionné
+          example: false
+        preferences:
+          type: object
+          properties:
+            language_id:
+              type: integer
+              nullable: true
+              example: 1
+            country_id:
+              type: integer
+              nullable: true
+              example: 1
+        supported_languages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Language'
+        countries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Country'
+paths:
+  /auth/register/send-code:
+    post:
+      tags:
+        - Authentication
+      operationId: sendRegisterOtp
+      summary: Envoyer un code OTP d'inscription
+      description: >-
+        Initie le flux d'inscription en transmettant un code à 6 chiffres par
+        email.
+
+
+        **Limite de débit :** `otp-send` (1/min, 5/h par IP/email).
+
+        **Anti-énumération :** Même réponse HTTP 200 si le compte existe déjà.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: newuser@example.com
+      responses:
+        '200':
+          description: Code de vérification envoyé avec succès
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - email
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    example: newuser@example.com
+                  expires_in:
+                    type: integer
+                    example: 600
+                    description: Validité du code OTP en secondes (10 min)
+                  resend_available_in:
+                    type: integer
+                    example: 60
+                    description: Temps d'attente avant renvoi possible en secondes
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/register/resend-code:
+    post:
+      tags:
+        - Authentication
+      operationId: resendRegisterOtp
+      summary: Renvoyer le code OTP d'inscription
+      description: >-
+        Renvoie un code OTP d'inscription frais après expiration du cooldown de
+        60 secondes.
+
+
+        **Limite de débit :** `otp-send` (1/min, 5/h).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: newuser@example.com
+      responses:
+        '200':
+          description: Nouveau code envoyé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - email
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  email:
+                    type: string
+                    example: newuser@example.com
+                  expires_in:
+                    type: integer
+                    example: 600
+                  resend_available_in:
+                    type: integer
+                    example: 60
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/register/verify-code:
+    post:
+      tags:
+        - Authentication
+      operationId: verifyRegisterOtp
+      summary: Vérifier le code OTP d'inscription
+      description: >-
+        Valide le code OTP à 6 chiffres et émet un `verification_token`
+        temporaire d'une durée de 15 minutes.
+
+
+        **Limite de débit :** `otp-verify` (10/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: newuser@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+      responses:
+        '200':
+          description: Code vérifié et jeton émis
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - verification_token
+                  - email
+                  - expires_in
+                properties:
+                  message:
+                    type: string
+                    example: Verification code confirmed.
+                  verification_token:
+                    type: string
+                    example: FIb4ZndtXbk7Ss7cmJydENkvsTM9pQWFjl4EFE9a5MMOhmONQphFr79NiM9sRZUr
+                  email:
+                    type: string
+                    example: newuser@example.com
+                  expires_in:
+                    type: integer
+                    example: 900
+                    description: Durée de vie du verification_token en secondes (15 min)
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/register/complete:
+    post:
+      tags:
+        - Authentication
+      operationId: completeRegistration
+      summary: Finaliser la création de compte
+      description: >-
+        Crée l'utilisateur avec son mot de passe et préférences, consomme le
+        `verification_token` et émet la première paire de jetons
+        d'authentification.
+
+
+        **Limite de débit :** `otp-verify` (10/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - verification_token
+                - first_name
+                - last_name
+                - password
+                - password_confirmation
+              properties:
+                verification_token:
+                  type: string
+                  example: FIb4ZndtXbk7Ss7cmJydENkvsTM9pQWFjl4EFE9a5MMOhmONQphFr79NiM9sRZUr
+                first_name:
+                  type: string
+                  maxLength: 255
+                  example: Alice
+                last_name:
+                  type: string
+                  maxLength: 255
+                  example: Dupont
+                password:
+                  type: string
+                  minLength: 8
+                  example: Password123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  example: Password123!
+                country_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+                  description: Requis s'il existe plus d'un pays actif en base
+                language_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+                device_name:
+                  type: string
+                  nullable: true
+                  example: iPhone 15
+      responses:
+        '201':
+          description: Compte créé et session démarrée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      operationId: loginWithCredentials
+      summary: Étape 1 de connexion (2FA)
+      description: >-
+        Vérifie les identifiants et envoie un code OTP à 6 chiffres par email
+        pour la validation à double facteur.
+
+
+        **Limite de débit :** `login` (5/min, 20/min/IP).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                password:
+                  type: string
+                  example: Password123!
+      responses:
+        '200':
+          description: Identifiants validés, saisie 2FA requise
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - challenge_token
+                  - email
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: >-
+                      Credentials verified. Please enter the verification code
+                      sent to your email.
+                  challenge_token:
+                    type: string
+                    example: c7a8b9e0f1...
+                  email:
+                    type: string
+                    example: alice@example.com
+                  expires_in:
+                    type: integer
+                    example: 600
+                  resend_available_in:
+                    type: integer
+                    example: 60
+        '403':
+          description: Vérification de nouvel email en attente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: You must verify your new email address before logging in.
+                  email:
+                    type: string
+                    example: alice@example.com
+                  pending_email:
+                    type: string
+                    example: new@example.com
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/login/resend-code:
+    post:
+      tags:
+        - Authentication
+      operationId: resendLoginOtp
+      summary: Renvoyer le code 2FA de connexion
+      description: >-
+        Renvoie un code OTP de connexion après expiration du délai de 60
+        secondes.
+
+
+        **Limite de débit :** `otp-send` (1/min, 5/h).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                challenge_token:
+                  type: string
+                  example: c7a8b9e0f1...
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+      responses:
+        '200':
+          description: Code 2FA renvoyé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - challenge_token
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: A verification code has been sent to your email address.
+                  challenge_token:
+                    type: string
+                    example: c7a8b9e0f1...
+                  expires_in:
+                    type: integer
+                    example: 600
+                  resend_available_in:
+                    type: integer
+                    example: 60
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/login/verify-code:
+    post:
+      tags:
+        - Authentication
+      operationId: verifyLoginOtp
+      summary: Étape 2 de connexion (Validation 2FA)
+      description: >-
+        Valide le code OTP 2FA associé au `challenge_token` et émet la paire de
+        tokens d'accès et de rafraîchissement.
+
+
+        **Limite de débit :** `otp-verify` (10/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challenge_token
+                - code
+              properties:
+                challenge_token:
+                  type: string
+                  example: c7a8b9e0f1...
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+                device_name:
+                  type: string
+                  nullable: true
+                  example: MacBook Pro
+      responses:
+        '200':
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/forgot-password/send-code:
+    post:
+      tags:
+        - Authentication
+      operationId: sendForgotPasswordOtp
+      summary: Demander la réinitialisation du mot de passe
+      description: |-
+        Envoie un code OTP à l'adresse email si le compte existe.
+
+        **Limite de débit :** `otp-send` (1/min, 5/h).
+        **Anti-énumération :** Réponse identique que le compte existe ou non.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+      responses:
+        '200':
+          description: Demande prise en compte
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - email
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: >-
+                      If an account exists for this email, a verification code
+                      has been sent.
+                  email:
+                    type: string
+                    example: alice@example.com
+                  expires_in:
+                    type: integer
+                    example: 600
+                  resend_available_in:
+                    type: integer
+                    example: 60
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/forgot-password/resend-code:
+    post:
+      tags:
+        - Authentication
+      operationId: resendForgotPasswordOtp
+      summary: Renvoyer le code OTP de mot de passe oublié
+      description: |-
+        Renvoie le code OTP après expiration du cooldown de 60 secondes.
+
+        **Limite de débit :** `otp-send` (1/min, 5/h).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+      responses:
+        '200':
+          description: Code renvoyé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - email
+                  - expires_in
+                  - resend_available_in
+                properties:
+                  message:
+                    type: string
+                    example: >-
+                      If an account exists for this email, a verification code
+                      has been sent.
+                  email:
+                    type: string
+                    example: alice@example.com
+                  expires_in:
+                    type: integer
+                    example: 600
+                  resend_available_in:
+                    type: integer
+                    example: 60
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/forgot-password/verify-code:
+    post:
+      tags:
+        - Authentication
+      operationId: verifyForgotPasswordOtp
+      summary: Vérifier le code de mot de passe oublié
+      description: >-
+        Valide le code OTP et génère un `reset_token` temporaire d'une validité
+        de 15 minutes.
+
+
+        **Limite de débit :** `otp-verify` (10/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+      responses:
+        '200':
+          description: Code validé, jeton de réinitialisation émis
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - reset_token
+                  - email
+                  - expires_in
+                properties:
+                  message:
+                    type: string
+                    example: >-
+                      Verification code confirmed. You can now reset your
+                      password.
+                  reset_token:
+                    type: string
+                    example: TzXHQwErQXBFn2imYnCQE5HNyMPcKPnsQAWK2gC2K8eMDvzD3c2swtirVDTuHai4
+                  email:
+                    type: string
+                    example: alice@example.com
+                  expires_in:
+                    type: integer
+                    example: 900
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/forgot-password/reset:
+    post:
+      tags:
+        - Authentication
+      operationId: resetPasswordWithToken
+      summary: Réinitialiser le mot de passe
+      description: >-
+        Met à jour le mot de passe à l'aide du `reset_token` et révoque toutes
+        les sessions existantes de l'utilisateur.
+
+
+        **Limite de débit :** `sensitive` (5/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - password
+                - password_confirmation
+              properties:
+                token:
+                  type: string
+                  example: TzXHQwErQXBFn2imYnCQE5HNyMPcKPnsQAWK2gC2K8eMDvzD3c2swtirVDTuHai4
+                password:
+                  type: string
+                  minLength: 8
+                  example: NewSecretPassword123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  example: NewSecretPassword123!
+      responses:
+        '200':
+          description: Mot de passe réinitialisé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Your password has been reset successfully.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/verify-pending-email:
+    post:
+      tags:
+        - Profile
+      operationId: verifyPendingEmailGuest
+      summary: Confirmer le nouvel email (Invité déconnecté)
+      description: >-
+        Permet de valider un changement d'email initié même si l'utilisateur
+        s'est déconnecté ou si sa session a expiré.
+
+
+        **Limite de débit :** `otp-verify` (10/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - code
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: alice.new@example.com
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+      responses:
+        '200':
+          description: Nouvelle adresse email confirmée et activée
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Email address verified and updated successfully.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/refresh:
+    post:
+      tags:
+        - Authentication
+      operationId: refreshAuthTokens
+      summary: Rafraîchir les jetons d'accès
+      description: >-
+        Échange un `refresh_token` valide contre un nouvel `access_token` et un
+        nouveau `refresh_token` (rotation).
+
+
+        **Protection contre la réutilisation :** La présentation d'un jeton déjà
+        tourné révoque l'intégralité de la famille de sessions.
+
+        **Limite de débit :** `refresh` (60/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  example: j1Vnvmv0JdLeO497WXv2vUzcbyr4GZN9MvKVbu6xV4dHEsVOWvczFV1lQKKMgnXm
+      responses:
+        '200':
+          description: Jetons rafraîchis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/me:
+    get:
+      tags:
+        - Profile
+      operationId: getAuthenticatedUser
+      summary: Consulter le profil utilisateur
+      description: |-
+        Retourne les détails du compte authentifié.
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - user
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/profile:
+    put:
+      tags:
+        - Profile
+      operationId: updateUserProfile
+      summary: Mettre à jour le profil
+      description: >-
+        Met à jour le nom, prénom et/ou demande un changement d'adresse email
+        (déclenche l'envoi d'un OTP sur la nouvelle adresse).
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                first_name:
+                  type: string
+                  maxLength: 255
+                  example: Alice
+                last_name:
+                  type: string
+                  maxLength: 255
+                  example: Durand
+                email:
+                  type: string
+                  format: email
+                  example: alice.new@example.com
+                country_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+                language_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+      responses:
+        '200':
+          description: Profil mis à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - user
+                properties:
+                  message:
+                    type: string
+                    example: Profile updated successfully.
+                  pending_email:
+                    type: string
+                    format: email
+                    nullable: true
+                    example: alice.new@example.com
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/profile/verify-email:
+    post:
+      tags:
+        - Profile
+      operationId: verifyNewEmailAuth
+      summary: Confirmer le nouvel email (Connecté)
+      description: >-
+        Valide le code OTP envoyé lors d'une modification d'email pour
+        l'utilisateur actuellement authentifié.
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                  example: '123456'
+      responses:
+        '200':
+          description: Nouvelle adresse confirmée et mise à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - user
+                properties:
+                  message:
+                    type: string
+                    example: Email address verified and updated successfully.
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/password:
+    put:
+      tags:
+        - Profile
+      operationId: changeUserPassword
+      summary: Changer le mot de passe
+      description: >-
+        Modifie le mot de passe après vérification du mot de passe actuel.
+        Révoque toutes les autres sessions actives.
+
+
+        **Limite de débit :** `sensitive` (5/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - current_password
+                - password
+                - password_confirmation
+              properties:
+                current_password:
+                  type: string
+                  example: Password123!
+                password:
+                  type: string
+                  minLength: 8
+                  example: NewPassword123!
+                password_confirmation:
+                  type: string
+                  minLength: 8
+                  example: NewPassword123!
+      responses:
+        '200':
+          description: Mot de passe changé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - other_sessions_revoked
+                properties:
+                  message:
+                    type: string
+                    example: Password changed successfully.
+                  other_sessions_revoked:
+                    type: integer
+                    example: 2
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/account:
+    delete:
+      tags:
+        - Profile
+      operationId: deleteUserAccount
+      summary: Supprimer le compte
+      description: >-
+        Suppression définitive (Soft Delete) du compte après confirmation du mot
+        de passe actuel. Révoque tous les jetons.
+
+
+        **Limite de débit :** `sensitive` (5/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                password:
+                  type: string
+                  example: Password123!
+      responses:
+        '200':
+          description: Compte supprimé
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Your account has been deleted.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/logout:
+    post:
+      tags:
+        - Devices
+      operationId: logoutCurrentSession
+      summary: Déconnexion de la session
+      description: |-
+        Révoque l'access token et le refresh token de la session courante.
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Déconnexion réussie
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/devices:
+    get:
+      tags:
+        - Devices
+      operationId: listActiveDevices
+      summary: Lister les appareils connectés
+      description: >-
+        Liste l'ensemble des sessions actives avec leur identifiant stable
+        (`family_id`).
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Liste des sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - devices
+                properties:
+                  devices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Device'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+    delete:
+      tags:
+        - Devices
+      operationId: disconnectOtherDevices
+      summary: Déconnecter tous les autres appareils
+      description: >-
+        Révoque toutes les sessions et tokens d'accès actifs à l'exception de
+        l'appareil courant.
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Autres appareils déconnectés
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - revoked_count
+                properties:
+                  message:
+                    type: string
+                    example: All other devices have been disconnected successfully.
+                  revoked_count:
+                    type: integer
+                    example: 2
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/devices/{id}:
+    delete:
+      tags:
+        - Devices
+      operationId: disconnectDeviceById
+      summary: Déconnecter un appareil spécifique
+      description: |-
+        Révoque la session d'un appareil à partir de son `family_id`.
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: id
+          in: path
+          required: true
+          description: Identifiant stable de session de l'appareil (UUID family_id)
+          schema:
+            type: string
+            example: 36a237e6-0023-44f4-8e78-b852be2b4594
+      responses:
+        '200':
+          description: Appareil déconnecté
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: Device disconnected successfully.
+                  current_device_revoked:
+                    type: boolean
+                    nullable: true
+                    example: false
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /locale:
+    get:
+      tags:
+        - Locale
+      operationId: getLocaleContext
+      summary: Consulter le contexte de localisation
+      description: >-
+        Retourne la langue et le pays appliqués ainsi que les options
+        supportées.
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Contexte de locale résolu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocaleContext'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+    patch:
+      tags:
+        - Locale
+      operationId: updateLocalePreferences
+      summary: Mettre à jour les préférences de langue/pays
+      description: >-
+        Modifie les préférences de langue et/ou de pays enregistrées dans le
+        profil utilisateur.
+
+
+        **Limite de débit :** `auth-api` (60/min).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+                  description: ID de la langue ou null pour auto
+                country_id:
+                  type: integer
+                  nullable: true
+                  example: 1
+                  description: ID du pays ou null pour auto
+                reset_to_auto:
+                  type: boolean
+                  example: false
+                  description: >-
+                    Réinitialise simultanément langue et pays en auto (interdit
+                    avec d'autres champs)
+      responses:
+        '200':
+          description: Préférences mises à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - locale
+                  - user
+                properties:
+                  message:
+                    type: string
+                    example: Locale preferences updated successfully.
+                  locale:
+                    $ref: '#/components/schemas/LocaleContext'
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /countries/active:
+    get:
+      tags:
+        - Countries
+      operationId: listActiveCountries
+      summary: Lister les pays actifs
+      description: >-
+        Retourne la liste publique des pays actifs disponibles pour sélection
+        manuelle.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Liste des pays actifs
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - country_selection_required
+                  - countries
+                properties:
+                  country_selection_required:
+                    type: boolean
+                    example: false
+                  countries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Country'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+

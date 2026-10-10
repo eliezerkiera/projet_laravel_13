@@ -1,3 +1,10 @@
+## [2026-10-10] — Génération et validation de la spécification OpenAPI v2 (openapi.yaml)
+- Génération complète du document `openapi.yaml` (spécification OpenAPI 3.0.3) couvrant l'ensemble des 25 endpoints de l'API v2.
+- Structuration par tags : `Authentication`, `Profile`, `Devices`, `Locale`, `Countries`.
+- Schémas réutilisables complets : `User`, `Device`, `Country`, `Language`, `LocaleContext`, `AuthTokenResponse`, `ValidationErrorResponse`, `RateLimitErrorResponse`, `ErrorResponse`.
+- Validation stricte avec Redocly CLI (`@redocly/cli lint openapi.yaml`) : 0 erreur, 0 avertissement.
+Fichiers : `openapi.yaml`, `.ai/changelog.md`
+
 ## [2026-10-09] — Réécriture du guide de l'API v2 et validation automatisée (Tâche 03)
 - Création du guide complet d'intégration et de recette manuelle pour les développeurs front/mobile dans `docs/api/guide_api_v2.md`.
 - Couverture exhaustive des 25 endpoints sous `/api/v2` avec exécution réelle, payloads exacts et format standardisé.
