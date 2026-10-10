@@ -1,3 +1,9 @@
+## [2026-10-10] — Alignement du guide API v2 sur les corrections résiduelles
+- Mise à jour de `docs/api/guide_api_v2.md` après la tâche 05 : réponses nominales d'inscription/récupération, traductions présentes, chaînage des tokens et cinq cas de résolution du pays.
+- Référence OpenAPI liée à son emplacement réel (`openapi.yaml` à la racine) ; ajout des tags OpenAPI à la table des 25 endpoints et correction des limiteurs de `profile/verify-email`.
+- Le cooldown OTP est signalé comme une exception possible à l'anti-énumération pour les demandes de renvoi. La collection Insomnia et `notes/auth_v2_summary.md` restent inchangées.
+Fichiers : `docs/api/guide_api_v2.md`, `.ai/changelog.md`
+
 ## [2026-10-10] — Tâche 05 : corrections résiduelles (anti-énumération, OpenAPI, otp-verify, retrait de l'arabe)
 - R1 (#6 anti-énumération) : retrait de `unique:users,email` (`RegisterSendCodeRequest`) et `exists:users,email` (`ForgotPasswordSendCodeRequest`) ; `register/*` et `forgot-password/*` renvoient désormais un `200` au corps identique que le compte existe ou non (aucun OTP pour un compte existant, notification « compte existant » différée via `afterResponse()` ; rien pour un email inconnu) ; `register/complete` renvoie `422 invalid_token` si l'email devient pris entre-temps (pré-vérification + `catch UniqueConstraintViolationException`) ; le `403` de `login` n'est renvoyé qu'après validation du mot de passe.
 - R2 : `DELETE /auth/devices/{id}` documente (composant `DeviceNotFoundError`) et renvoie `404 device_not_found` pour un appareil inconnu ou appartenant à un autre utilisateur ; correction d'un bug `current_device_revoked` (calculé avant la révocation, désormais réellement renvoyé) ; composant OpenAPI `NotFoundError` devenu inutilisé supprimé.

@@ -7,6 +7,7 @@
 > - **Intégration rapide :** Lisez les sections 1, 2, 3 et 5 pour appréhender les concepts clés, le flux de langue/pays et la gestion des tokens.  
 > - **Référence des endpoints :** Consultez les sections 4, 6 et 7 pour les signatures exactes des 25 endpoints de l'API.  
 > - **Recette & Tests manuels :** Utilisez la section 10 pour configurer Insomnia ou Postman avec chaînage automatique et exécuter la checklist de validation.
+> - **Référence complète :** Consultez la [spécification OpenAPI v2](../../openapi.yaml) pour les schémas, les codes d'erreur et les réponses détaillées.
 
 ---
 
@@ -478,15 +479,14 @@ Accept: application/json
 
 ### 3.6 Ce que la langue change réellement
 
-### 3.6 Ce que la langue change réellement
+La langue résolue (`fr` ou `en`) s'applique aux textes produits par l'API et aux emails OTP :
 
-Conformément à l'audit i18n, voici exactement ce que la langue résolue influence :
+1. **Messages métier :** Les messages d'authentification (`lang/{en,fr}/auth.php`) sont traduits selon la locale appliquée.
+2. **Messages de validation :** `lang/fr/validation.php` existe ; les erreurs de validation, notamment celles des champs obligatoires et des formats, sont traduites en français lorsque `fr` est appliqué.
+3. **Emails OTP :** Le sujet et le corps utilisent les clés `mail.*` de `lang/{en,fr}/auth.php` et suivent la locale appliquée au moment de l'envoi.
+4. **Noms de pays et de langues :** Ils proviennent de la base de données et ne sont pas traduits par l'API.
 
-1. **Messages d'API métier :** Les messages des erreurs d'authentification proviennent de `lang/{en,fr}/auth.php` (`otp_invalid`, `credentials_invalid`, `device_not_found`, `unauthenticated`, `too_many_requests`, etc.) et sont traduits selon la locale résolue.
-2. **Messages de validation Laravel :** Seul `lang/en/validation.php` existe ; il n'y a **pas** de `lang/fr/validation.php`. Les messages de validation des formulaires (champ requis, format email, etc.) restent donc **en anglais** même lorsque la langue appliquée est `fr`.
-3. **Emails OTP :** Le sujet et le corps des emails de vérification (clés `mail.*` dans `lang/*/auth.php`) sont traduits selon la locale résolue au moment de l'envoi.
-3. **Noms des modèles :** Les libellés d'affichage retournés pour les pays et langues proviennent de la base de données et ne sont **pas** traduits.
-4. **Recommandation Front :** Les messages JSON sont fournis à titre d'aide au débogage. Pour une expérience utilisateur optimale, votre application cliente doit mapper le champ d'erreur `code` vers son propre dictionnaire de traductions locales (i18next, vue-i18n, etc.) plutôt que d'afficher `message`.
+Les fichiers de langue anglais et français ont les mêmes clés (vérifié par `AuthLocalizationTest`) ; aucune clé de traduction manquante n'est signalée par ce contrôle. Le champ `code` n'est jamais traduit : le client doit baser sa logique sur `code`, et peut traduire les messages avec son propre dictionnaire au lieu d'afficher `message`.
 
 ---
 
@@ -565,8 +565,8 @@ sequenceDiagram
 
     Note over Client,API: Étape 1 : Demande de code OTP
     Client->>API: POST /auth/register/send-code {"email": "..."}
-    API->>Mail: Envoi code 6 chiffres (validité 10 min)
-    API-->>Client: 200 OK {"message", "email", "expires_in": 600, "resend_available_in": 60}
+    API->>Mail: Envoi OTP seulement si l'adresse n'est pas déjà inscrite
+    API-->>Client: 200 OK, réponse identique dans les deux cas
 
     Note over Client,API: Étape 2 : Vérification du code OTP
     Client->>API: POST /auth/register/verify-code {"email": "...", "code": "..."}
@@ -612,10 +612,10 @@ Content-Type: application/json
 **Erreurs possibles**
 | Statut | `code` | Quand |
 |---|---|---|
-| `422` | `validation_failed` | Format de l'adresse email invalide, champ manquant, ou **adresse déjà associée à un compte** (`errors.email = ["The email has already been taken."]`). |
+| `422` | `validation_failed` | Adresse email manquante ou format invalide. |
 | `429` | `too_many_requests` | Limite de débit atteinte (attendre `retry_after` secondes). |
 
-**À retenir :** ⚠️ Le contrôle `unique` sur `email` fait que **l'existence d'un compte est révélée** par un `422` (`The email has already been taken.`). Aucun code OTP n'est alors envoyé. Le front doit afficher un message neutre et proposer la connexion ou le mot de passe oublié plutôt que d'indiquer explicitement que l'email est pris.
+**À retenir :** Pour une adresse déjà inscrite, l'API renvoie `200 OK` avec le même corps que pour une nouvelle adresse. Aucun OTP d'inscription n'est créé ; une notification d'aide est envoyée après la réponse pour orienter l'utilisateur vers la connexion ou la récupération du mot de passe.
 
 ---
 
@@ -647,7 +647,7 @@ Content-Type: application/json
 ```json
 {
   "message": "Verification code confirmed.",
-  "verification_token": "FIb4ZndtXbk7Ss7cmJydENkvsTM9pQWFjl4EFE9a5MMOhmONQphFr79NiM9sRZUr",
+  "verification_token": "abc...xyz",
   "email": "newuser@example.com",
   "expires_in": 900
 }
@@ -676,7 +676,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "verification_token": "FIb4ZndtXbk7Ss7cmJydENkvsTM9pQWFjl4EFE9a5MMOhmONQphFr79NiM9sRZUr",
+  "verification_token": "abc...xyz",
   "first_name": "Alice",
   "last_name": "Dupont",
   "password": "Password123!",
@@ -703,7 +703,7 @@ Content-Type: application/json
 {
   "message": "Your account has been registered successfully.",
   "access_token": "1|abc...",
-  "refresh_token": "j1Vnvmv0JdLeO497WXv2vUzcbyr4GZN9MvKVbu6xV4dHEsVOWvczFV1lQKKMgnXm",
+  "refresh_token": "abc...xyz",
   "token_type": "Bearer",
   "expires_in": 86400,
   "refresh_expires_in": 2592000,
@@ -834,7 +834,7 @@ Content-Type: application/json
 {
   "message": "Logged in successfully.",
   "access_token": "2|abc...",
-  "refresh_token": "r9T5nvAXjazh79xbahsv6aQUD02Z4ylwvIAi908c72a1j1Vnvmv0JdLeO497WXv2",
+  "refresh_token": "abc...xyz",
   "token_type": "Bearer",
   "expires_in": 86400,
   "refresh_expires_in": 2592000,
@@ -874,8 +874,8 @@ sequenceDiagram
     participant Mail as Service Email
 
     Client->>API: POST /auth/forgot-password/send-code {"email": "..."}
-    API->>Mail: Envoi code 6 chiffres si compte existant
-    API-->>Client: 200 OK {"message", "email", "expires_in": 600, "resend_available_in": 60}
+    API->>Mail: Envoi OTP seulement si le compte existe
+    API-->>Client: 200 OK, même corps que le compte existe ou non
 
     Client->>API: POST /auth/forgot-password/verify-code {"email": "...", "code": "..."}
     API-->>Client: 200 OK {"reset_token", "expires_in": 900}
@@ -919,10 +919,10 @@ Content-Type: application/json
 **Erreurs possibles**
 | Statut | `code` | Quand |
 |---|---|---|
-| `422` | `validation_failed` | Format email invalide ou **email non associé à un compte** (`errors.email = ["The selected email is invalid."]`, règle `exists`). |
+| `422` | `validation_failed` | Adresse email manquante ou format invalide. |
 | `429` | `too_many_requests` | Limite de débit atteinte. |
 
-> ⚠️ Le message d'API est neutre (« If an account exists… »), mais la règle `exists` renvoie un `422` lorsque l'email est **inconnu** : l'existence d'un compte est donc révélée par le statut HTTP. Afficher un message générique côté front.
+**À retenir :** Une adresse inconnue reçoit `200 OK` et le même corps qu'une adresse connue lorsqu'aucun OTP récent ne déclenche le délai de renvoi. Aucun OTP n'est envoyé si le compte n'existe pas.
 
 ---
 
@@ -954,7 +954,7 @@ Content-Type: application/json
 ```json
 {
   "message": "Verification code confirmed. You can now reset your password.",
-  "reset_token": "TzXHQwErQXBFn2imYnCQE5HNyMPcKPnsQAWK2gC2K8eMDvzD3c2swtirVDTuHai4",
+  "reset_token": "abc...xyz",
   "email": "alice@example.com",
   "expires_in": 900
 }
@@ -976,7 +976,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "reset_token": "TzXHQwErQXBFn2imYnCQE5HNyMPcKPnsQAWK2gC2K8eMDvzD3c2swtirVDTuHai4",
+  "reset_token": "abc...xyz",
   "password": "NewSecretPassword123!",
   "password_confirmation": "NewSecretPassword123!"
 }
@@ -1007,25 +1007,126 @@ Content-Type: application/json
 
 ### 4.4 Renvoi de code OTP
 
-Chacun des 3 flux dispose d'un endpoint dédié pour renvoyer un code frais en cas de non-réception. Le délai de temporisation (*cooldown*) est de 60 secondes.
+Chacun des trois flux dispose d'un endpoint de renvoi. Le délai de temporisation (*cooldown*) est de 60 secondes ; la réponse réussie fournit `resend_available_in` pour afficher le compte à rebours. Le dépassement du limiteur renvoie `429` avec `Retry-After`.
 
 #### `POST /api/v2/auth/register/resend-code`
-- **Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
-- **Corps :** `{"email": "newuser@example.com"}`
-- **Réponse 200 :** `{"message": "A verification code has been sent...", "email": "...", "expires_in": 600, "resend_available_in": 60}`
-- **Erreur :** `422 validation_failed` si l'email est **déjà lié à un compte** (règle `unique`).
+
+**Rôle :** Renvoie le code d'inscription après expiration du délai de renvoi.
+**Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
+
+**Requête**
+```http
+POST /api/v2/auth/register/resend-code HTTP/1.1
+Host: 127.0.0.1:8000
+Accept: application/json
+Content-Type: application/json
+```
+```json
+{
+  "email": "newuser@example.com"
+}
+```
+
+| Champ | Type | Obligatoire | Règles |
+|---|---|---|---|
+| `email` | string | Oui | Adresse email valide, 255 caractères maximum. |
+
+**Succès — `200 OK`**
+```json
+{
+  "message": "A verification code has been sent to your email address.",
+  "email": "newuser@example.com",
+  "expires_in": 600,
+  "resend_available_in": 60
+}
+```
+
+**Erreurs possibles**
+| Statut | `code` | Quand |
+|---|---|---|
+| `422` | `validation_failed` | Email manquant ou invalide ; renvoi trop rapide si un OTP existe encore (`errors.email`). |
+| `429` | `too_many_requests` | Limite de débit atteinte. |
+
+**À retenir :** Pour une adresse déjà inscrite, l'API renvoie le succès sans créer d'OTP et envoie une notification d'aide après la réponse. Une adresse de non-inscrit ayant déjà un OTP récent peut recevoir `422 validation_failed` à cause du cooldown.
 
 #### `POST /api/v2/auth/login/resend-code`
-- **Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
-- **Corps :** `{"challenge_token": "c7a8b9e0f1..."}` — **`challenge_token` obligatoire**, seul identifiant accepté.
-- **Réponse 200 :** `{"message": "A verification code has been sent...", "challenge_token": "...", "expires_in": 600, "resend_available_in": 60}`
-- **Erreur :** `422 invalid_token` si le `challenge_token` est inconnu ou expiré (`errors.challenge_token`).
+
+**Rôle :** Renvoie le code 2FA associé au `challenge_token` de connexion.
+**Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
+
+**Requête**
+```http
+POST /api/v2/auth/login/resend-code HTTP/1.1
+Host: 127.0.0.1:8000
+Accept: application/json
+Content-Type: application/json
+```
+```json
+{
+  "challenge_token": "abc...xyz"
+}
+```
+
+| Champ | Type | Obligatoire | Règles |
+|---|---|---|---|
+| `challenge_token` | string | Oui | Jeton temporaire obtenu à `POST /auth/login`. |
+
+**Succès — `200 OK`**
+```json
+{
+  "message": "A verification code has been sent to your email address.",
+  "challenge_token": "abc...xyz",
+  "expires_in": 600,
+  "resend_available_in": 60
+}
+```
+
+**Erreurs possibles**
+| Statut | `code` | Quand |
+|---|---|---|
+| `422` | `invalid_token` | `challenge_token` inconnu ou expiré (`errors.challenge_token`). |
+| `422` | `validation_failed` | `challenge_token` manquant ou renvoi trop rapide (`errors.email` pour le cooldown). |
+| `429` | `too_many_requests` | Limite de débit atteinte. |
 
 #### `POST /api/v2/auth/forgot-password/resend-code`
-- **Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
-- **Corps :** `{"email": "user@example.com"}`
-- **Réponse 200 :** `{"message": "If an account exists...", "email": "...", "expires_in": 600, "resend_available_in": 60}`
-- **Erreur :** `422 validation_failed` si l'email est **inconnu** (règle `exists`).
+
+**Rôle :** Renvoie le code de récupération après expiration du délai de renvoi.
+**Auth :** Publique · **Limite :** `otp-send` (1/min, 5/h)
+
+**Requête**
+```http
+POST /api/v2/auth/forgot-password/resend-code HTTP/1.1
+Host: 127.0.0.1:8000
+Accept: application/json
+Content-Type: application/json
+```
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+| Champ | Type | Obligatoire | Règles |
+|---|---|---|---|
+| `email` | string | Oui | Adresse email valide. |
+
+**Succès — `200 OK`**
+```json
+{
+  "message": "If an account exists for this email, a verification code has been sent.",
+  "email": "user@example.com",
+  "expires_in": 600,
+  "resend_available_in": 60
+}
+```
+
+**Erreurs possibles**
+| Statut | `code` | Quand |
+|---|---|---|
+| `422` | `validation_failed` | Email manquant ou invalide ; renvoi trop rapide pour un compte qui a un OTP récent (`errors.email`). |
+| `429` | `too_many_requests` | Limite de débit atteinte. |
+
+**À retenir :** Pour une adresse inconnue, l'API renvoie le même succès sans créer ni envoyer d'OTP. En revanche, si un compte connu a un OTP récent, le cooldown peut renvoyer `422 validation_failed` ; cette différence de statut peut révéler l'existence du compte.
 
 > [!TIP]
 > **Recommandation Front :** Désactivez le bouton « Renvoyer le code » dans l'interface et affichez un compte à rebours de 60 secondes basé sur `resend_available_in`.
@@ -1048,7 +1149,7 @@ Content-Type: application/json
 ```
 ```json
 {
-  "refresh_token": "j1Vnvmv0JdLeO497WXv2vUzcbyr4GZN9MvKVbu6xV4dHEsVOWvczFV1lQKKMgnXm"
+  "refresh_token": "abc...xyz"
 }
 ```
 
@@ -1061,7 +1162,7 @@ Content-Type: application/json
 {
   "message": "Token refreshed successfully.",
   "access_token": "3|def...",
-  "refresh_token": "k2Wownw1KeMfP508XYw3wVadczs5HaOA0NwLWcv7yW5eIFtWPwdzGW2mRLLNhoYn",
+  "refresh_token": "abc...xyz",
   "token_type": "Bearer",
   "expires_in": 86400,
   "refresh_expires_in": 2592000,
@@ -1326,9 +1427,10 @@ Authorization: Bearer 2|abc...
 
 #### Cas 1 : Utilisateur toujours connecté
 #### `POST /api/v2/auth/profile/verify-email`
+> **Limites effectives :** `auth-api` (60/min) et `otp-verify` (5/min).
 
 **Rôle :** Valide le code OTP envoyé sur la nouvelle adresse pour un utilisateur connecté.  
-**Auth :** Bearer requis · **Limite :** `auth-api` (60/min)
+**Auth :** Bearer requis · **Limites :** `auth-api` (60/min) et `otp-verify` (5/min)
 
 **Requête**
 ```http
@@ -1604,45 +1706,45 @@ Authorization: Bearer 2|abc...
 
 Tableau complet des 25 routes de l'API v2 (conforme à `php artisan route:list`) :
 
-| Méthode | Chemin complet | Auth requise | Limiteur | Corps | Code succès | Section détaillée |
-|---|---|---|---|---|---|---|
-| `POST` | `/api/v2/auth/register/send-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) |
-| `POST` | `/api/v2/auth/register/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) |
-| `POST` | `/api/v2/auth/register/verify-code` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) |
-| `POST` | `/api/v2/auth/register/complete` | Publique | `otp-verify` (5/min) | JSON (`verification_token`, ...) | `201 Created` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) |
-| `POST` | `/api/v2/auth/login` | Publique | `login` (5/min, 20/min/IP) | JSON (`email`, `password`) | `200 OK` | [4.2 Connexion](#42-connexion-avec-2fa-obligatoire-otp) |
-| `POST` | `/api/v2/auth/login/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`challenge_token`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) |
-| `POST` | `/api/v2/auth/login/verify-code` | Publique | `otp-verify` (5/min) | JSON (`challenge_token`, `code`) | `200 OK` | [4.2 Connexion](#42-connexion-avec-2fa-obligatoire-otp) |
-| `POST` | `/api/v2/auth/forgot-password/send-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) |
-| `POST` | `/api/v2/auth/forgot-password/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) |
-| `POST` | `/api/v2/auth/forgot-password/verify-code` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) |
-| `POST` | `/api/v2/auth/forgot-password/reset` | Publique | `sensitive` (5/min) | JSON (`reset_token`, `password`, ...) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) |
-| `POST` | `/api/v2/auth/verify-pending-email` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [6.3 Confirmation email](#63-confirmation-du-nouvel-email-connecté-vs-invité) |
-| `POST` | `/api/v2/auth/refresh` | Publique | `refresh` (60/min) | JSON (`refresh_token`) | `200 OK` | [4.5 Rafraîchissement](#45-rafraîchissement-des-jetons) |
-| `GET` | `/api/v2/auth/me` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.1 Consultation profil](#61-consultation-du-profil) |
-| `PUT` | `/api/v2/auth/profile` | Bearer requis | `auth-api` (60/min) | JSON (`first_name`, ...) | `200 OK` | [6.2 Modification profil](#62-modification-du-profil-et-changement-demail) |
-| `POST` | `/api/v2/auth/profile/verify-email` | Bearer requis | `auth-api` (60/min) | JSON (`code`) | `200 OK` | [6.3 Confirmation email](#63-confirmation-du-nouvel-email-connecté-vs-invité) |
-| `PUT` | `/api/v2/auth/password` | Bearer requis | `sensitive` (5/min) | JSON (`current_password`, ...) | `200 OK` | [6.4 Mot de passe](#64-changement-de-mot-de-passe) |
-| `DELETE` | `/api/v2/auth/account` | Bearer requis | `sensitive` (5/min) | JSON (`password`) | `200 OK` | [6.7 Suppression compte](#67-suppression-définitive-du-compte) |
-| `POST` | `/api/v2/auth/logout` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.6 Déconnexion](#66-déconnexion-de-la-session-courante) |
-| `GET` | `/api/v2/auth/devices` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) |
-| `DELETE` | `/api/v2/auth/devices/{id}` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) |
-| `DELETE` | `/api/v2/auth/devices` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) |
-| `GET` | `/api/v2/locale` | Publique | `auth-api` (60/min) | Aucun | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) |
-| `GET` | `/api/v2/countries/active` | Publique | Aucune | Aucun | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) |
-| `PATCH` | `/api/v2/locale` | Bearer requis | `auth-api` (60/min) | JSON (`language_id`, ...) | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) |
+| Méthode | Chemin complet | Auth requise | Limiteur | Corps | Code succès | Section détaillée | OpenAPI |
+|---|---|---|---|---|---|---|---|
+| `POST` | `/api/v2/auth/register/send-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/register/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/register/verify-code` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/register/complete` | Publique | `otp-verify` (5/min) | JSON (`verification_token`, ...) | `201 Created` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/login` | Publique | `login` (5/min, 20/min/IP) | JSON (`email`, `password`) | `200 OK` | [4.2 Connexion](#42-connexion-avec-2fa-obligatoire-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/login/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`challenge_token`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/login/verify-code` | Publique | `otp-verify` (5/min) | JSON (`challenge_token`, `code`) | `200 OK` | [4.2 Connexion](#42-connexion-avec-2fa-obligatoire-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/forgot-password/send-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/forgot-password/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/forgot-password/verify-code` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/forgot-password/reset` | Publique | `sensitive` (5/min) | JSON (`reset_token`, `password`, ...) | `200 OK` | [4.3 Mot de passe oublié](#43-mot-de-passe-oublié-otp) | `Authentication` |
+| `POST` | `/api/v2/auth/verify-pending-email` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [6.3 Confirmation email](#63-confirmation-du-nouvel-email-connecté-vs-invité) | `Profile` |
+| `POST` | `/api/v2/auth/refresh` | Publique | `refresh` (60/min) | JSON (`refresh_token`) | `200 OK` | [4.5 Rafraîchissement](#45-rafraîchissement-des-jetons) | `Authentication` |
+| `GET` | `/api/v2/auth/me` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.1 Consultation profil](#61-consultation-du-profil) | `Profile` |
+| `PUT` | `/api/v2/auth/profile` | Bearer requis | `auth-api` (60/min) | JSON (`first_name`, ...) | `200 OK` | [6.2 Modification profil](#62-modification-du-profil-et-changement-demail) | `Profile` |
+| `POST` | `/api/v2/auth/profile/verify-email` | Bearer requis | `auth-api` (60/min) + `otp-verify` (5/min) | JSON (`code`) | `200 OK` | [6.3 Confirmation email](#63-confirmation-du-nouvel-email-connecté-vs-invité) | `Profile` |
+| `PUT` | `/api/v2/auth/password` | Bearer requis | `sensitive` (5/min) | JSON (`current_password`, ...) | `200 OK` | [6.4 Mot de passe](#64-changement-de-mot-de-passe) | `Profile` |
+| `DELETE` | `/api/v2/auth/account` | Bearer requis | `sensitive` (5/min) | JSON (`password`) | `200 OK` | [6.7 Suppression compte](#67-suppression-définitive-du-compte) | `Profile` |
+| `POST` | `/api/v2/auth/logout` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.6 Déconnexion](#66-déconnexion-de-la-session-courante) | `Devices` |
+| `GET` | `/api/v2/auth/devices` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) | `Devices` |
+| `DELETE` | `/api/v2/auth/devices/{id}` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) | `Devices` |
+| `DELETE` | `/api/v2/auth/devices` | Bearer requis | `auth-api` (60/min) | Aucun | `200 OK` | [6.5 Appareils connectés](#65-gestion-des-sessions-et-appareils-connectés) | `Devices` |
+| `GET` | `/api/v2/locale` | Publique | `auth-api` (60/min) | Aucun | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) | `Locale` |
+| `GET` | `/api/v2/countries/active` | Publique | Aucune | Aucun | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) | `Countries` |
+| `PATCH` | `/api/v2/locale` | Bearer requis | `auth-api` (60/min) | JSON (`language_id`, ...) | `200 OK` | [3.5 Référence locale](#35-référence-des-endpoints-de-locale) | `Locale` |
 
 ---
 
 ## 8. Limites de débit
 
-Toutes les routes de l'API sont protégées par des limiteurs de débit nommés, configurés dans `config/auth_api.php` :
+Les limiteurs nommés ci-dessous sont configurés dans `config/auth_api.php`. `GET /api/v2/countries/active` ne porte pas de limiteur dans `routes/api.php`.
 
 | Limiteur | Quota réel | Portée de la clé | Endpoints concernés |
 |---|---|---|---|
 | `auth-api` | **60 req / min** | ID utilisateur ou Adresse IP | Toutes routes sous `/v2/auth` et `/v2/locale` |
 | `otp-send` | **1 req / min** & **5 req / h** | Email (ou token) + Adresse IP | `register/send-code`, `register/resend-code`, `login/resend-code`, `forgot-password/send-code`, `forgot-password/resend-code` |
-| `otp-verify` | **5 req / min** | Email (ou token) + Adresse IP | `register/verify-code`, `register/complete`, `login/verify-code`, `forgot-password/verify-code`, `verify-pending-email` |
+| `otp-verify` | **5 req / min** | Email/token + IP ; utilisateur connecté + IP pour `profile/verify-email` | `register/verify-code`, `register/complete`, `login/verify-code`, `forgot-password/verify-code`, `verify-pending-email`, `profile/verify-email` |
 | `login` | **5 req / min** & **20 req / min par IP** | Email + Adresse IP (et IP seule) | `POST /api/v2/auth/login` |
 | `refresh` | **60 req / min** | Adresse IP | `POST /api/v2/auth/refresh` |
 | `sensitive` | **5 req / min** | ID utilisateur ou Adresse IP | `forgot-password/reset`, `PUT /password`, `DELETE /account` |
@@ -1731,7 +1833,7 @@ Pour supprimer tout copier-coller manuel de tokens entre les étapes :
       }
   }
   ```
-- **Sur `POST /api/v2/auth/login/verify-code` et `POST /api/v2/auth/refresh` :**
+- **Sur `POST /api/v2/auth/register/complete`, `POST /api/v2/auth/login/verify-code` et `POST /api/v2/auth/refresh` :**
   ```javascript
   if (pm.response.code === 200 || pm.response.code === 201) {
       const data = pm.response.json();
@@ -1755,7 +1857,7 @@ Pour supprimer tout copier-coller manuel de tokens entre les étapes :
 #### Dans Insomnia (Template Tags / Response Hook)
 Dans la barre d'URL ou le corps de requête, tapez `Response => Body Attribute`, cliquez dessus et configurez :
 - **Request :** Sélectionnez la requête précédente.
-- **Filter (JSONPath) :** `$.access_token` (ou `$.challenge_token`, `$.verification_token`, `$.reset_token`).
+- **Filter (JSONPath) :** associez `$.challenge_token` à `challenge_token` après `auth/login`, `$.verification_token` à `verification_token` après `register/verify-code`, `$.reset_token` à `reset_token` après `forgot-password/verify-code`, et `$.access_token` / `$.refresh_token` aux variables correspondantes après `register/complete`, `login/verify-code` ou `refresh`.
 - **Trigger :** Always.
 
 ---
@@ -1779,7 +1881,7 @@ En environnement de développement (`MAIL_MAILER=log`), le code envoyé par emai
 | # | Action | Requête exécutée | Résultat attendu |
 |---|---|---|---|
 | 1 | Vérifier locale publique | `GET {{ locale_url }}` | `200 OK`, `country_selection_required: false` (si 1 pays actif) |
-| 2 | Inscription - Demande OTP | `POST {{ auth_url }}/register/send-code` | `200 OK`, `expires_in: 600`, `resend_available_in: 60` |
+| 2 | Inscription - Demande OTP | `POST {{ auth_url }}/register/send-code` | `200 OK`, `expires_in: 600`, `resend_available_in: 60` ; répéter avec une adresse déjà inscrite et comparer le corps |
 | 3 | Inscription - Validation code | `POST {{ auth_url }}/register/verify-code` | `200 OK`, `verification_token` émis |
 | 4 | Inscription - Finalisation | `POST {{ auth_url }}/register/complete` | `201 Created`, `access_token` et `refresh_token` émis |
 | 5 | Vérifier compte créé | `GET {{ auth_url }}/me` | `200 OK`, profil utilisateur complet avec relations |
@@ -1789,7 +1891,7 @@ En environnement de développement (`MAIL_MAILER=log`), le code envoyé par emai
 | 9 | Rafraîchir les tokens | `POST {{ auth_url }}/refresh` | `200 OK`, nouveaux jetons, ancien refresh révoqué |
 | 10 | Réutilisation illicite | Rejouer `POST {{ auth_url }}/refresh` avec l'ancien token | `422 Unprocessable Content`, famille révoquée |
 | 11 | Lister les appareils | `GET {{ auth_url }}/devices` | `200 OK`, liste avec UUIDs stables et `is_current` |
-| 12 | Mot de passe oublié - OTP | `POST {{ auth_url }}/forgot-password/send-code` | `200 OK` (ou `422 validation_failed` si email inconnu — fuite d'existence) |
+| 12 | Mot de passe oublié - OTP | `POST {{ auth_url }}/forgot-password/send-code` | `200 OK` avec le même corps pour une adresse connue ou inconnue ; aucun OTP pour une adresse inconnue |
 | 13 | Mot de passe oublié - Vérif | `POST {{ auth_url }}/forgot-password/verify-code` | `200 OK`, `reset_token` retourné |
 | 14 | Mot de passe oublié - Reset | `POST {{ auth_url }}/forgot-password/reset` | `200 OK`, toutes sessions précédentes déconnectées |
 | 15 | Déconnexion session | `POST {{ auth_url }}/logout` | `200 OK`, session courante révoquée |
@@ -1799,11 +1901,12 @@ En environnement de développement (`MAIL_MAILER=log`), le code envoyé par emai
 
 ### 10.5 Checklist de validation finale
 
-- [ ] **Langue & Pays :** `GET /api/v2/locale` renvoie la langue et le pays actifs sans écriture en base.
+- [ ] **Langue & Pays :** vérifier les cinq situations du tableau §3.4 (`profile`, pays unique, plusieurs pays actifs, profil sans pays avec plusieurs pays actifs, pays du profil désactivé) et les priorités de langue de `GET /api/v2/locale`, sans écriture en base.
 - [ ] **Cascade :** `X-Locale-Override` surcharge le profil utilisateur et `Accept-Language`.
 - [ ] **PATCH Locale :** Mise à jour individuelle (`language_id`, `country_id`), remise à `null` et `reset_to_auto` validées.
-- [ ] **Inscription OTP :** Flux en 3 étapes ; **attention** : `register/send-code` renvoie un `422 validation_failed` si l'email est déjà utilisé (fuite d'existence, non masquée).
-- [ ] **Connexion 2FA :** Flux en 2 étapes avec `challenge_token` et égalisation de timing sur mauvais mot de passe.
+- [ ] **Inscription OTP :** Flux en 3 étapes ; les réponses de `register/send-code` et `register/resend-code` sont identiques pour une adresse déjà inscrite et une nouvelle adresse.
+- [ ] **Anti-énumération :** comparer les réponses d'inscription, de connexion et de récupération pour les adresses connues/inconnues ; répéter aussi les demandes pendant le cooldown. Voir l'avertissement §4.4 : le cooldown d'un OTP existant peut encore distinguer une adresse connue pour la récupération et un nouvel email d'inscription.
+- [ ] **Connexion 2FA :** Flux en 2 étapes avec `challenge_token` ; `credentials_invalid` reste identique pour un email inconnu et un mot de passe incorrect.
 - [ ] **Forgot Password :** Flux complet avec `reset_token` et révocation de toutes les sessions existantes au reset.
 - [ ] **Rotation Refresh :** Nouveau refresh token émis à chaque refresh ; rejeu de l'ancien token révoque la famille entière.
 - [ ] **Identité d'appareil :** `family_id` stable retourné dans `GET /devices` et persistant à travers les refreshs.
@@ -1854,5 +1957,4 @@ Corrections appliquées après revue de sécurité et d'intégration. **Ces chan
 | C7 | `POST /auth/login/resend-code` | `challenge_token` **ou** `email` (optionnels) | `challenge_token` **obligatoire**, repli `email` retiré |
 | C8 | `openapi.yaml` | exemple générique, codes d'erreur incomplets, en-têtes absents | exemple par endpoint, `Content-Language`/`Vary`, énumération complète des `code` |
 | C9 | Traçabilité & sessions | révocation non traçable, pas de `family_id`, emails OTP synchrones | migration de traçabilité (`revoked_reason`, `rotated_at`), `family_id` stable, envoi via `afterResponse()` |
-| C10 | Internationalisation | messages métier non traduits | `lang/{en,fr}/auth.php` traduits ; **validation encore en anglais** si `fr` (`lang/fr/validation.php` absent) |
-
+| C10 | Internationalisation | messages métier et validations non traduits en français | messages `auth.php` et `validation.php` disponibles en anglais/français avec les mêmes clés ; `code` reste identique et non traduit |
