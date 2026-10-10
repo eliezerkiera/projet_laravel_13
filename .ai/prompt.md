@@ -1,3 +1,3 @@
 - lis le fichier `AGENTS.md` pour avoir le context si tu ne l'a pas deja fait
 - lis le fichier `.ai/instructions.md` 
-- Lis et exécute `.ai\agent-prompts\03_tache_documentation.md` en respectant toutes les instructions.
+- Lis et exécute `.ai\agent-prompts\05_corrections_residuelles.md` en respectant toutes les instructions.

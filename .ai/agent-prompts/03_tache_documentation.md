@@ -6,17 +6,20 @@
 
 Produire **un guide Markdown unique, fiable, complet et facile à suivre**, destiné à des **développeurs front web et mobile** qui intègrent l'API v2, et qui sert aussi de procédure de test manuel (Insomnia / Postman).
 
-**Prérequis :** les tâches 01 et 02 sont terminées, leurs tests passent, et `docs/api/audit_auth_v2.md` existe.
+**Prérequis :** les tâches 01, 02, 04 et 05 sont terminées, leurs tests passent, et `docs/api/audit_auth_v2.md` ainsi que `docs/api/openapi.yaml` existent.
 
 **Entrées :**
-- l'ancien guide `notes/test_auth_v2_final.md` ;
+- l'ancien guide `test_auth_v2_final.md` (le fichier doit se trouver dans le dépôt, par exemple dans `docs/api/` ; s'il est absent, demande-le) ;
 - `docs/api/audit_auth_v2.md` ;
+- `docs/api/openapi.yaml` : la **référence machine** des endpoints (schémas, codes d'erreur, limites), déjà produite et corrigée ;
 - le **code réel** et `php artisan route:list --path=api/v2 --json`.
 
 **Sortie :**
 - `docs/api/guide_api_v2.md` (le nouveau guide) ;
 - l'ancien guide déplacé dans `docs/api/archive/` ;
 - un test de cohérence (voir fin du document).
+
+Si `notes/auth_v2_summary.md` ou des collections Insomnia existent dans le dépôt, **ne les modifie pas** : signale simplement dans ton rapport qu'elles sont à mettre à jour ou à archiver.
 
 ---
 
@@ -26,6 +29,15 @@ Produire **un guide Markdown unique, fiable, complet et facile à suivre**, dest
 2. Si tu ne peux pas exécuter ou vérifier une information, écris à cet endroit **`⚠️ À confirmer : <ce qui manque>`** et liste toutes ces mentions dans le rapport.
 3. L'ancien guide est **une source d'idées, pas une source de vérité**. En cas de désaccord avec le code, c'est le code qui a raison. Corrige l'ancien contenu et signale l'écart dans ton rapport.
 4. Les valeurs de durée (OTP, tokens) proviennent de la config réelle, pas d'estimations.
+
+---
+
+## Répartition des rôles : OpenAPI et guide
+
+- L'**OpenAPI** est la référence exhaustive et outillable de chaque endpoint (schémas, énumération des `code`, limites). **Ne la recopie pas en entier** dans le guide.
+- Le **guide** apporte ce que l'OpenAPI ne dit pas : le parcours, les concepts, l'ordre des appels, la gestion des tokens côté client, les exemples d'intégration, les pièges, les tests manuels.
+- Les deux doivent rester **cohérents** : mêmes noms de champs, mêmes `code`, mêmes limites, mêmes durées. En cas d'écart constaté, corrige le bon des deux, et signale-le dans ton rapport.
+- Dans l'en-tête du guide, renvoie vers `docs/api/openapi.yaml` pour la référence complète. Les sections de flux ne montrent que les requêtes et réponses utiles à la compréhension (extraits **réels**, tokens tronqués).
 
 ---
 
@@ -71,7 +83,7 @@ Cette section doit rendre le comportement **évident** :
 - **3.3 Priorité de résolution** : tableau des 5 niveaux avec la valeur de `source` correspondante, et la règle « une valeur inconnue est ignorée, jamais d'erreur ».
 - **3.4 Le pays** : règles de résolution, `country_selection_required` (tableau des 5 situations), pas de détection par IP, aucun header de pays.
 - **3.5 Référence de `GET /locale` et `PATCH /locale`** (au modèle d'endpoint), avec **tous les cas du `PATCH`** : langue seule, pays seul, `null` pour remettre en automatique un champ, `reset_to_auto`, combinaisons interdites.
-- **3.6 Ce que la langue change réellement** : d'après l'audit i18n du rapport de la tâche 01 (messages de validation, messages métier, emails, noms). Dis la vérité, y compris « les messages d'API sont en anglais : afficher votre propre texte à partir du `code` ».
+- **3.6 Ce que la langue change réellement** : d'après l'audit i18n (rapports des tâches 01, 04 C10 et 05 R5). L'audit de départ a établi que les messages d'authentification sont **traduits** (`lang/fr` et `lang/en`). Dis la vérité sur ce qui est traduit et ce qui ne l'est pas (messages de validation, emails OTP, noms de pays et de langues), signale les clés manquantes, et rappelle que **`code` n'est jamais traduit** : c'est lui que le front doit tester.
 - **3.7 Exemple d'intégration** (TypeScript, court) : initialisation au démarrage, intercepteur qui ajoute `X-Locale-Override`, changement de langue.
 - **3.8 Pièges courants** : tableau court (ex. « j'ai envoyé `Accept-Language` après avoir changé de langue et rien ne change » → utilise `X-Locale-Override` ; « le pays est `null` » → `country_selection_required`).
 
@@ -90,16 +102,16 @@ Pour chaque flux : **un diagramme Mermaid de séquence** (client / API / email),
 - Que faire si `/refresh` échoue (`422` : `refresh_token_invalid` ou `refresh_token_expired`) : vider les tokens, retour à l'écran de connexion. Précise que c'est un **422 et non un 401**, et pourquoi il ne faut pas relancer l'intercepteur de refresh sur cette route.
 
 ### 6. Profil, mot de passe, email, appareils, déconnexion
-Tous les endpoints protégés de `routes/api.php`, y compris `PUT /profile`, `profile/verify-email`, `verify-pending-email` (explique la différence avec `profile/verify-email` et quand l'utiliser), `PUT /password` (effet : autres appareils déconnectés), `DELETE /account` (mot de passe requis), `devices` (format, `is_current`, `id` stable), `logout` (ce qui est révoqué exactement).
+Tous les endpoints protégés de `routes/api.php`, y compris `PUT /profile` (il ne modifie plus la langue ni le pays : c'est le rôle exclusif de `PATCH /locale`), `profile/verify-email`, `verify-pending-email` (explique la différence avec `profile/verify-email` et quand l'utiliser), `PUT /password` (effet : autres appareils déconnectés), `DELETE /account` (mot de passe requis), `devices` (format, `is_current`, `id` stable), `logout` (ce qui est révoqué exactement).
 
 ### 7. Référence des endpoints
-**Un seul tableau** de tous les endpoints : méthode, chemin complet, auth requise, limiteur de débit, corps, code de succès, lien vers la section détaillée. Il doit correspondre exactement à `route:list`.
+**Un seul tableau** de tous les endpoints : méthode, chemin complet, auth requise, limiteur de débit, corps, code de succès, lien vers la section détaillée. Il doit correspondre exactement à `route:list` **et** aux chemins de `docs/api/openapi.yaml` (ajoute une colonne « OpenAPI » avec le tag de l'endpoint).
 
 ### 8. Limites de débit
 Tableau des limiteurs (valeurs réelles), comportement `429`, `Retry-After`, recommandation front (désactiver le bouton et afficher le compte à rebours).
 
 ### 9. Catalogue des erreurs
-Un tableau unique : `code` | statut HTTP | message exact | quand | **action recommandée pour le front**. Il doit couvrir au moins le catalogue défini dans `.ai/agent-prompts/02_tache_auth_securite.md` section M. Ajoute un exemple de réponse de validation (`422` avec `errors`).
+Un tableau unique : `code` | statut HTTP | message exact | quand | **action recommandée pour le front**. Il doit reprendre **exactement** l'énumération `code` de l'OpenAPI, noms compris (`otp_max_attempts`, `invalid_refresh_token`, `invalid_token`, `device_not_found`, etc.), telle que fixée par `04_tache_corrections.md` C1 et `05_corrections_residuelles.md` R2. Les noms du catalogue de la tâche 02 §M qui diffèrent sont **abandonnés**. Ajoute un exemple de réponse de validation (`422` avec `errors`).
 
 ### 10. Tests manuels (Insomnia / Postman)
 - **10.1 Environnement** : variables et valeurs réelles (reprendre `base_url`, `auth_url`, tokens, etc. ; supprime les variables inutilisées, ajoute `locale_url` si utile).
@@ -110,7 +122,7 @@ Un tableau unique : `code` | statut HTTP | message exact | quand | **action reco
 - **10.6 Réinitialiser les données** entre deux scénarios (commandes exactes).
 
 ### 11. Annexe : changements par rapport à l'ancienne version
-Tableau des **changements cassants** repris des rapports des tâches 01 et 02 (route déplacée, champs retirés, nouveaux champs, nouveaux codes), pour les équipes qui connaissaient l'ancien guide.
+Tableau des **changements cassants** repris des rapports des tâches 01, 02, 04 et 05 (route déplacée, champs retirés, nouveaux champs, nouveaux codes), pour les équipes qui connaissaient l'ancien guide.
 
 ---
 
@@ -161,6 +173,7 @@ Objectif : empêcher que le guide dérive du code.
 ## Définition de terminé
 
 - [ ] `docs/api/guide_api_v2.md` conforme à la structure imposée (sections 0 à 11), un seul sommaire, un seul modèle d'endpoint.
+- [ ] Le guide est cohérent avec `openapi.yaml` (noms de champs, `code`, limites, durées) ; tout écart est corrigé et signalé.
 - [ ] Tous les endpoints de `route:list` documentés, avec requêtes/réponses **réellement exécutées**.
 - [ ] Les flux inscription, connexion, **forgot-password complet**, refresh et réutilisation ont chacun un diagramme Mermaid.
 - [ ] La section 3 (langue/pays) est autonome : un développeur front qui ne lit que cette section sait quoi faire.
@@ -169,4 +182,4 @@ Objectif : empêcher que le guide dérive du code.
 - [ ] Chaînage automatique des tokens documenté (Insomnia et Postman).
 - [ ] Aucune mention `⚠️ À confirmer` non listée dans le rapport.
 - [ ] Ancien guide archivé ; test de cohérence documentation/routes en place et vert ; toute la suite de tests passe.
-- [ ] Rapport final au format du `00_contexte_commun.md` §5, avec la liste des `⚠️ À confirmer` et des écarts constatés entre l'ancien guide et le code.
+- [ ] Rapport final au format du `.ai/agent-prompts/00_contexte_commun.md` §5, avec la liste des `⚠️ À confirmer` et des écarts constatés entre l'ancien guide et le code.
