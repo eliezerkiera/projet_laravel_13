@@ -51,16 +51,8 @@ class DeviceController extends Controller
             ], 404);
         }
 
-        // Revoke the refresh token
-        $refreshToken->revoke('device_revoked');
-
-        // Revoke the access token for this device
-        $request->user()
-            ->tokens()
-            ->where('name', $refreshToken->device_name)
-            ->delete();
-
-        // Check if this was the current device
+        // Determine whether this is the current device before revoking anything,
+        // otherwise the lookup below can no longer find the non-revoked token.
         $currentAccessToken = $request->user()->currentAccessToken();
         $currentRefreshToken = $currentAccessToken ? $request->user()
             ->refreshTokens()
@@ -69,6 +61,15 @@ class DeviceController extends Controller
             ->first() : null;
 
         $isCurrentDevice = $currentRefreshToken && $currentRefreshToken->family_id === $id;
+
+        // Revoke the refresh token
+        $refreshToken->revoke('device_revoked');
+
+        // Revoke the access token for this device
+        $request->user()
+            ->tokens()
+            ->where('name', $refreshToken->device_name)
+            ->delete();
 
         $response = [
             'message' => __('auth.device_disconnected'),

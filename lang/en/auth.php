@@ -64,6 +64,12 @@ return [
         'body' => 'Your verification code is:',
         'expiry' => 'This code will expire in :minutes minutes.',
         'warning' => 'If you did not initiate this request, no further action is required.',
+        'existing_account' => [
+            'subject' => 'Account already exists',
+            'body' => 'An account is already registered with this email address.',
+            'login_hint' => 'If this is your account, please log in directly instead.',
+            'recovery_hint' => 'If you forgot your password, use the password reset flow.',
+        ],
     ],
 
 ];

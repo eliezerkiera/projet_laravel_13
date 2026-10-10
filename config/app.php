@@ -82,6 +82,19 @@ return [
 
     'fallback_locale' => env('APP_FALLBACK_LOCALE', 'en'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Supported Locales
+    |--------------------------------------------------------------------------
+    |
+    | The languages advertised by the API and accepted in requests. Only codes
+    | present here can be resolved, persisted and returned by the locale
+    | resolution service (fr and en are the only supported languages).
+    |
+    */
+
+    'available_locales' => array_values(array_filter(array_map('trim', explode(',', (string) env('APP_AVAILABLE_LOCALES', 'fr,en'))))),
+
     'faker_locale' => env('APP_FAKER_LOCALE', 'en_US'),
 
     /*

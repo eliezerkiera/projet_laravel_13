@@ -90,18 +90,6 @@ class DatabaseSeeder extends Seeder
                 'is_default' => false,
                 'sort_order' => 2,
             ],
-            [
-                'code' => 'ar',
-                'name' => 'Arabic',
-                'native_name' => 'العربية',
-                'flag' => '🇸🇦',
-                'locale' => 'ar_SA',
-                'carbon_locale' => 'ar',
-                'direction' => 'rtl',
-                'is_active' => true,
-                'is_default' => false,
-                'sort_order' => 3,
-            ],
         ];
 
         foreach ($languages as $language) {
@@ -114,7 +102,6 @@ class DatabaseSeeder extends Seeder
 
         $fr = Language::where('code', 'fr')->first();
         $en = Language::where('code', 'en')->first();
-        $ar = Language::where('code', 'ar')->first();
 
         $countries = [
             [

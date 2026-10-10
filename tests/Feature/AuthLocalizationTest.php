@@ -5,6 +5,8 @@ use App\Models\Language;
 use App\Models\User;
 use App\Models\VerificationCode;
 use Database\Seeders\DatabaseSeeder;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -154,4 +156,35 @@ test('it keeps the error code identical between languages', function () {
     expect($inEnglish->json('code'))->toBe($inFrench->json('code'))
         ->and($inEnglish->json('code'))->toBe('otp_invalid')
         ->and($inEnglish->json('message'))->not->toBe($inFrench->json('message'));
+});
+
+test('validation errors use French with the French locale override', function () {
+    $this->withHeader('X-Locale-Override', 'fr')
+        ->postJson('/api/v2/auth/register/send-code', [])
+        ->assertUnprocessable()
+        ->assertHeader('Content-Language', 'fr')
+        ->assertJsonPath('code', 'validation_failed')
+        ->assertJsonPath('errors.email.0', 'Le champ adresse e-mail est obligatoire.');
+});
+
+test('French and English translation files have matching keys', function () {
+    $englishFiles = collect(File::allFiles(lang_path('en')))
+        ->map(fn ($file) => $file->getRelativePathname())
+        ->sort()
+        ->values();
+    $frenchFiles = collect(File::allFiles(lang_path('fr')))
+        ->map(fn ($file) => $file->getRelativePathname())
+        ->sort()
+        ->values();
+
+    expect($frenchFiles->all())->toBe($englishFiles->all());
+
+    foreach ($englishFiles as $relativePath) {
+        $englishKeys = array_keys(Arr::dot(require lang_path('en/'.$relativePath)));
+        $frenchKeys = array_keys(Arr::dot(require lang_path('fr/'.$relativePath)));
+        sort($englishKeys);
+        sort($frenchKeys);
+
+        expect($frenchKeys)->toBe($englishKeys);
+    }
 });

@@ -213,11 +213,24 @@ test('pending_email_verification_required is returned with the pending email on 
     ]);
 });
 
-test('device_not_found is returned when the device does not exist', function () {
-    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
-        ->deleteJson('/api/v2/auth/devices/'.(string) Str::uuid());
+test('device_not_found is returned for unknown and foreign devices', function () {
+    $foreignUser = User::factory()->create();
+    $foreignDevice = RefreshToken::create([
+        'user_id' => $foreignUser->id,
+        'token' => Str::random(64),
+        'device_name' => 'Foreign Device',
+        'expires_at' => now()->addDays(30),
+        'revoked' => false,
+        'family_id' => (string) Str::uuid(),
+    ]);
 
-    assertErrorCode($response, 'device_not_found', 404);
+    $unknownResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson('/api/v2/auth/devices/'.(string) Str::uuid());
+    assertErrorCode($unknownResponse, 'device_not_found', 404);
+
+    $foreignResponse = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson('/api/v2/auth/devices/'.$foreignDevice->family_id);
+    assertErrorCode($foreignResponse, 'device_not_found', 404);
 });
 
 test('resource_not_found is returned for any other 404', function () {

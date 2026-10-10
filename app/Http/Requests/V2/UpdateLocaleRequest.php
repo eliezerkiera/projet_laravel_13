@@ -93,10 +93,10 @@ class UpdateLocaleRequest extends FormRequest
                 }
             }
 
-            // Additional validation for language_id (must be active if is_active column exists)
+            // Additional validation for language_id (must be supported by the application)
             if ($this->has('language_id') && $this->language_id !== null) {
                 $language = Language::find($this->language_id);
-                if ($language && ! $language->is_active) {
+                if ($language && ! in_array($language->code, config('app.available_locales', ['fr', 'en']), true)) {
                     $validator->errors()->add(
                         'language_id',
                         'The selected language is invalid.'

@@ -239,6 +239,16 @@ class LocaleResolver
     }
 
     /**
+     * Get the codes configured as supported by the application.
+     *
+     * @return array<int, string>
+     */
+    protected function getAvailableLanguageCodes(): array
+    {
+        return config('app.available_locales', ['fr', 'en']);
+    }
+
+    /**
      * Get supported languages indexed by code (cached per request).
      */
     protected function getSupportedLanguages(): array
@@ -249,6 +259,7 @@ class LocaleResolver
 
         $languages = Language::query()
             ->where('is_active', true)
+            ->whereIn('code', $this->getAvailableLanguageCodes())
             ->get()
             ->keyBy('code');
 
@@ -318,6 +329,7 @@ class LocaleResolver
     {
         return Language::query()
             ->where('is_active', true)
+            ->whereIn('code', $this->getAvailableLanguageCodes())
             ->orderBy('sort_order')
             ->get()
             ->all();

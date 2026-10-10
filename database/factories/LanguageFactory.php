@@ -18,12 +18,12 @@ class LanguageFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => fake()->unique()->randomElement(['fr', 'en', 'es', 'de', 'it', 'pt', 'ar']),
+            'code' => fake()->unique()->randomElement(['fr', 'en', 'es', 'de', 'it', 'pt']),
             'name' => fake()->word(),
             'native_name' => fake()->word(),
-            'flag' => fake()->randomElement(['🇫🇷', '🇬🇧', '🇪🇸', '🇩🇪', '🇮🇹', '🇵🇹', '🇸🇦']),
-            'locale' => fake()->unique()->randomElement(['fr_FR', 'en_US', 'es_ES', 'de_DE', 'it_IT', 'pt_PT', 'ar_SA']),
-            'carbon_locale' => fake()->randomElement(['fr', 'en', 'es', 'de', 'it', 'pt', 'ar']),
+            'flag' => fake()->randomElement(['🇫🇷', '🇬🇧', '🇪🇸', '🇩🇪', '🇮🇹', '🇵🇹']),
+            'locale' => fake()->unique()->randomElement(['fr_FR', 'en_US', 'es_ES', 'de_DE', 'it_IT', 'pt_PT']),
+            'carbon_locale' => fake()->randomElement(['fr', 'en', 'es', 'de', 'it', 'pt']),
             'direction' => 'ltr',
             'is_active' => true,
             'is_default' => false,

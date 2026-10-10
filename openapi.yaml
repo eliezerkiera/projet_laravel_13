@@ -12,7 +12,7 @@ info:
     - **Headers indispensables** : Toutes les requêtes doivent spécifier
     `Accept: application/json`.
 
-    - **Langue & Pays** : `X-Locale-Override` (ex: `fr`, `en`, `ar`) est
+    - **Langue & Pays** : `X-Locale-Override` (ex: `fr`, `en`) est
     recommandé sur toutes les requêtes pour forcer la langue souhaitée sans
     modifier le profil utilisateur.
 
@@ -63,7 +63,7 @@ components:
       in: header
       description: >-
         Code de langue prioritaire pour surcharger la langue de réponse sans
-        persister en base (ex: `fr`, `en`, `ar`)
+        persister en base (ex: `fr`, `en`)
       required: false
       schema:
         type: string
@@ -102,8 +102,8 @@ components:
           example:
             code: unauthenticated
             message: Unauthenticated.
-    NotFoundError:
-      description: Ressource ou session introuvable
+    DeviceNotFoundError:
+      description: Appareil ou session introuvable (existe plus ou appartient à un autre utilisateur)
       headers:
         Content-Language:
           $ref: '#/components/headers/ContentLanguage'
@@ -114,8 +114,8 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           example:
-            code: resource_not_found
-            message: Resource not found.
+            code: device_not_found
+            message: The device session was not found.
     TooManyRequestsError:
       description: Quota de requêtes dépassé (limiteur de débit)
       headers:
@@ -237,6 +237,7 @@ components:
           example: French
     LanguageWithSource:
       type: object
+      nullable: true
       required:
         - id
         - code
@@ -289,6 +290,7 @@ components:
           $ref: '#/components/schemas/Language'
     CountryDetail:
       type: object
+      nullable: true
       required:
         - id
         - code
@@ -467,21 +469,17 @@ components:
     LocaleContext:
       type: object
       required:
+        - language
+        - country
         - country_selection_required
         - preferences
         - supported_languages
         - countries
       properties:
         language:
-          type: object
-          nullable: true
-          allOf:
-            - $ref: '#/components/schemas/LanguageWithSource'
+          $ref: '#/components/schemas/LanguageWithSource'
         country:
-          type: object
-          nullable: true
-          allOf:
-            - $ref: '#/components/schemas/CountryDetail'
+          $ref: '#/components/schemas/CountryDetail'
         country_selection_required:
           type: boolean
           description: >-
@@ -572,7 +570,7 @@ paths:
                     example: 60
                     description: Temps d'attente avant renvoi possible en secondes
         '422':
-          description: Données invalides (email requis, format ou déjà utilisé).
+          description: Données invalides (email requis, format).
           headers:
             Content-Language:
               $ref: '#/components/headers/ContentLanguage'
@@ -841,6 +839,22 @@ paths:
                   last_name: Dupont
                   full_name: Alice Dupont
                   email: alice@example.com
+                  pending_email: null
+                  email_verified_at: '2026-10-09T23:49:56.000000Z'
+                  language_id: 1
+                  language:
+                    id: 1
+                    code: fr
+                    name: French
+                  country_id: 1
+                  country:
+                    id: 1
+                    code: BF
+                    name: Burkina Faso
+                    phone_code: '+226'
+                    is_active: true
+                  created_at: '2026-10-09T23:49:56.000000Z'
+                  updated_at: '2026-10-09T23:49:56.000000Z'
         '422':
           description: >-
             Jeton de vérification invalide ou expiré. Codes possibles : invalid_token, validation_failed.
@@ -1129,6 +1143,22 @@ paths:
                   last_name: Dupont
                   full_name: Alice Dupont
                   email: alice@example.com
+                  pending_email: null
+                  email_verified_at: '2026-10-09T23:49:56.000000Z'
+                  language_id: 1
+                  language:
+                    id: 1
+                    code: fr
+                    name: French
+                  country_id: 1
+                  country:
+                    id: 1
+                    code: BF
+                    name: Burkina Faso
+                    phone_code: '+226'
+                    is_active: true
+                  created_at: '2026-10-09T23:49:56.000000Z'
+                  updated_at: '2026-10-09T23:49:56.000000Z'
         '422':
           description: >-
             challenge_token invalide, code OTP invalide/expiré/tentatives. Codes possibles : invalid_token, otp_invalid, otp_expired, otp_max_attempts, validation_failed.
@@ -1598,6 +1628,22 @@ paths:
                   last_name: Dupont
                   full_name: Alice Dupont
                   email: alice@example.com
+                  pending_email: null
+                  email_verified_at: '2026-10-09T23:49:56.000000Z'
+                  language_id: 1
+                  language:
+                    id: 1
+                    code: fr
+                    name: French
+                  country_id: 1
+                  country:
+                    id: 1
+                    code: BF
+                    name: Burkina Faso
+                    phone_code: '+226'
+                    is_active: true
+                  created_at: '2026-10-09T23:49:56.000000Z'
+                  updated_at: '2026-10-09T23:49:56.000000Z'
         '422':
           description: >-
             Refresh token invalide ou expiré. Codes possibles : invalid_refresh_token, refresh_token_expired.
@@ -1748,7 +1794,7 @@ paths:
         l'utilisateur actuellement authentifié.
 
 
-        **Limite de débit :** `auth-api` (60/min).
+        **Limite de débit :** `otp-verify` (5/min, clé : identifiant utilisateur + IP).
       security:
         - BearerAuth: []
       parameters:
@@ -1872,6 +1918,9 @@ paths:
                   other_sessions_revoked:
                     type: integer
                     example: 2
+              example:
+                message: Password changed successfully.
+                other_sessions_revoked: 2
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
@@ -2036,6 +2085,18 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Device'
+              example:
+                devices:
+                  - id: 36a237e6-0023-44f4-8e78-b852be2b4594
+                    name: iPhone 15
+                    is_current: true
+                    last_used_at: '2026-10-09T23:49:56.000000Z'
+                    created_at: '2026-10-05T08:12:33.000000Z'
+                  - id: 7f4d1c9a-5b2e-4a0d-9c31-1e6b8f2a4d77
+                    name: MacBook Pro
+                    is_current: false
+                    last_used_at: '2026-10-08T09:14:03.000000Z'
+                    created_at: '2026-10-01T17:45:20.000000Z'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '429':
@@ -2078,6 +2139,9 @@ paths:
                   revoked_count:
                     type: integer
                     example: 2
+              example:
+                message: All other devices have been disconnected successfully.
+                revoked_count: 2
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '429':
@@ -2125,11 +2189,22 @@ paths:
                   current_device_revoked:
                     type: boolean
                     nullable: true
-                    example: false
+                    description: Présent et vrai uniquement lorsque la session révoquée est celle de la requête courante
+                    example: true
+              examples:
+                other_device:
+                  summary: Autre appareil déconnecté
+                  value:
+                    message: Device disconnected successfully.
+                current_device:
+                  summary: Appareil de la requête courante déconnecté
+                  value:
+                    message: Device disconnected successfully.
+                    current_device_revoked: true
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '404':
-          $ref: '#/components/responses/NotFoundError'
+          $ref: '#/components/responses/DeviceNotFoundError'
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /locale:
@@ -2160,6 +2235,169 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LocaleContext'
+              examples:
+                anonymous_single_active_country:
+                  summary: Anonyme, un seul pays actif (langue héritée du pays)
+                  value:
+                    language:
+                      id: 1
+                      code: fr
+                      name: French
+                      source: country
+                    country:
+                      id: 1
+                      code: BF
+                      name: Burkina Faso
+                      native_name: Burkina Faso
+                      phone_code: '+226'
+                      is_active: true
+                      source: single_active
+                      language:
+                        id: 1
+                        code: fr
+                        name: French
+                    country_selection_required: false
+                    preferences:
+                      language_id: null
+                      country_id: null
+                    supported_languages:
+                      - id: 1
+                        code: fr
+                        name: French
+                      - id: 2
+                        code: en
+                        name: English
+                    countries:
+                      - id: 1
+                        code: BF
+                        name: Burkina Faso
+                        native_name: Burkina Faso
+                        phone_code: '+226'
+                        language:
+                          id: 1
+                          code: fr
+                          name: French
+                anonymous_multiple_active_countries:
+                  summary: Anonyme, plusieurs pays actifs (sélection requise, country null)
+                  value:
+                    language:
+                      id: 2
+                      code: en
+                      name: English
+                      source: default
+                    country: null
+                    country_selection_required: true
+                    preferences:
+                      language_id: null
+                      country_id: null
+                    supported_languages:
+                      - id: 1
+                        code: fr
+                        name: French
+                      - id: 2
+                        code: en
+                        name: English
+                    countries:
+                      - id: 1
+                        code: BF
+                        name: Burkina Faso
+                        native_name: Burkina Faso
+                        phone_code: '+226'
+                        language:
+                          id: 1
+                          code: fr
+                          name: French
+                      - id: 2
+                        code: SN
+                        name: Senegal
+                        native_name: Sénégal
+                        phone_code: '+221'
+                        language:
+                          id: 1
+                          code: fr
+                          name: French
+                authenticated_with_preferences:
+                  summary: Connecté avec préférences (langue et pays du profil)
+                  value:
+                    language:
+                      id: 1
+                      code: fr
+                      name: French
+                      source: profile
+                    country:
+                      id: 1
+                      code: BF
+                      name: Burkina Faso
+                      native_name: Burkina Faso
+                      phone_code: '+226'
+                      is_active: true
+                      source: profile
+                      language:
+                        id: 1
+                        code: fr
+                        name: French
+                    country_selection_required: false
+                    preferences:
+                      language_id: 1
+                      country_id: 1
+                    supported_languages:
+                      - id: 1
+                        code: fr
+                        name: French
+                      - id: 2
+                        code: en
+                        name: English
+                    countries:
+                      - id: 1
+                        code: BF
+                        name: Burkina Faso
+                        native_name: Burkina Faso
+                        phone_code: '+226'
+                        language:
+                          id: 1
+                          code: fr
+                          name: French
+                authenticated_with_inactive_country:
+                  summary: Connecté dont le pays du profil est devenu inactif (sélection requise)
+                  value:
+                    language:
+                      id: 1
+                      code: fr
+                      name: French
+                      source: profile
+                    country:
+                      id: 4
+                      code: FR
+                      name: France
+                      native_name: France
+                      phone_code: '+33'
+                      is_active: false
+                      source: profile
+                      language:
+                        id: 1
+                        code: fr
+                        name: French
+                    country_selection_required: true
+                    preferences:
+                      language_id: 1
+                      country_id: 4
+                    supported_languages:
+                      - id: 1
+                        code: fr
+                        name: French
+                      - id: 2
+                        code: en
+                        name: English
+                    countries:
+                      - id: 1
+                        code: BF
+                        name: Burkina Faso
+                        native_name: Burkina Faso
+                        phone_code: '+226'
+                        language:
+                          id: 1
+                          code: fr
+                          name: French
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
     patch:
@@ -2246,6 +2484,69 @@ paths:
                     $ref: '#/components/schemas/LocaleContext'
                   user:
                     $ref: '#/components/schemas/User'
+              example:
+                message: Locale preferences updated successfully.
+                locale:
+                  language:
+                    id: 1
+                    code: fr
+                    name: French
+                    source: profile
+                  country:
+                    id: 1
+                    code: BF
+                    name: Burkina Faso
+                    native_name: Burkina Faso
+                    phone_code: '+226'
+                    is_active: true
+                    source: profile
+                    language:
+                      id: 1
+                      code: fr
+                      name: French
+                  country_selection_required: false
+                  preferences:
+                    language_id: 1
+                    country_id: 1
+                  supported_languages:
+                    - id: 1
+                      code: fr
+                      name: French
+                    - id: 2
+                      code: en
+                      name: English
+                  countries:
+                    - id: 1
+                      code: BF
+                      name: Burkina Faso
+                      native_name: Burkina Faso
+                      phone_code: '+226'
+                      language:
+                        id: 1
+                        code: fr
+                        name: French
+                user:
+                  id: 1
+                  first_name: Alice
+                  last_name: Dupont
+                  full_name: Alice Dupont
+                  email: alice@example.com
+                  pending_email: null
+                  email_verified_at: '2026-10-09T23:49:56.000000Z'
+                  language_id: 1
+                  language:
+                    id: 1
+                    code: fr
+                    name: French
+                  country_id: 1
+                  country:
+                    id: 1
+                    code: BF
+                    name: Burkina Faso
+                    phone_code: '+226'
+                    is_active: true
+                  created_at: '2026-10-09T23:49:56.000000Z'
+                  updated_at: '2026-10-10T10:05:00.000000Z'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':

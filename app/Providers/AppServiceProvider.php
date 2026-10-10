@@ -60,8 +60,14 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('otp-verify', function (Request $request): Limit {
+            // Authenticated users (e.g. profile email change verification) are
+            // keyed by their user id plus IP; anonymous flows fall back to the
+            // transport identifier (email/token plus IP).
+            $key = $request->user('sanctum')?->getAuthIdentifier()
+                ?? $this->requestIdentifier($request);
+
             return Limit::perMinute(config('auth_api.rate_limits.otp_verify.per_minute', 5))
-                ->by('otp-verify:'.$this->requestIdentifier($request));
+                ->by('otp-verify:'.$key);
         });
 
         RateLimiter::for('login', function (Request $request): Limit {

@@ -633,4 +633,57 @@ class LocaleTest extends TestCase
         $response->assertStatus(200);
         $response->assertHeader('Vary');
     }
+
+    public function test_arabic_override_is_ignored_and_only_french_and_english_are_supported(): void
+    {
+        $french = $this->createFrenchLanguage();
+        $english = $this->createEnglishLanguage();
+        Language::create([
+            'code' => 'ar',
+            'name' => 'Arabic',
+            'native_name' => 'العربية',
+            'locale' => 'ar_SA',
+            'carbon_locale' => 'ar',
+            'direction' => 'rtl',
+            'is_active' => true,
+            'is_default' => false,
+            'sort_order' => 3,
+        ]);
+
+        $response = $this->getJson('/api/v2/locale', [
+            'X-Locale-Override' => 'ar',
+            'Accept-Language' => 'fr',
+        ]);
+
+        $response->assertOk()
+            ->assertHeader('Content-Language', 'fr')
+            ->assertJsonPath('language.code', 'fr')
+            ->assertJsonPath('language.source', 'accept_language');
+
+        expect(array_column($response->json('supported_languages'), 'code'))
+            ->toBe(['fr', 'en']);
+    }
+
+    public function test_patch_locale_rejects_an_unsupported_arabic_language_id(): void
+    {
+        $arabic = Language::create([
+            'code' => 'ar',
+            'name' => 'Arabic',
+            'native_name' => 'العربية',
+            'locale' => 'ar_SA',
+            'carbon_locale' => 'ar',
+            'direction' => 'rtl',
+            'is_active' => true,
+            'is_default' => false,
+            'sort_order' => 3,
+        ]);
+
+        $user = User::factory()->create();
+        $token = $user->createToken('test')->plainTextToken;
+
+        $this->withHeader('Authorization', 'Bearer '.$token)
+            ->patchJson('/api/v2/locale', ['language_id' => $arabic->id])
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.language_id.0', 'The selected language is invalid.');
+    }
 }

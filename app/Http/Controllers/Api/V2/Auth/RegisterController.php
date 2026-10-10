@@ -8,10 +8,12 @@ use App\Http\Requests\V2\RegisterCompleteRequest;
 use App\Http\Requests\V2\RegisterSendCodeRequest;
 use App\Http\Requests\V2\RegisterVerifyCodeRequest;
 use App\Http\Resources\V2\UserResource;
+use App\Jobs\SendExistingAccountNotice;
 use App\Models\RefreshToken;
 use App\Models\User;
 use App\Models\VerificationCode;
 use App\Services\OtpService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
 
@@ -26,8 +28,10 @@ class RegisterController extends Controller
         $existingUser = User::where('email', $request->email)->first();
 
         if ($existingUser) {
-            // Don't send OTP, but return same response
-            // In production, send email informing that account exists
+            // Don't send OTP, but notify after the response that an account
+            // already exists, so the two cases remain indistinguishable.
+            SendExistingAccountNotice::dispatch($request->email)->afterResponse();
+
             $expiresIn = $otpService->getExpirationMinutes() * 60;
             $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
@@ -61,7 +65,10 @@ class RegisterController extends Controller
         $existingUser = User::where('email', $request->email)->first();
 
         if ($existingUser) {
-            // Don't send OTP, but return same response
+            // Don't send OTP, but notify after the response that an account
+            // already exists, so the two cases remain indistinguishable.
+            SendExistingAccountNotice::dispatch($request->email)->afterResponse();
+
             $expiresIn = $otpService->getExpirationMinutes() * 60;
             $resendAvailableIn = $otpService->getResendCooldownSeconds();
 
@@ -122,15 +129,26 @@ class RegisterController extends Controller
             throw ApiException::forField('invalid_token', 'verification_token', __('auth.invalid_token'));
         }
 
+        // If the email became taken between the OTP verification and this
+        // request, refuse the completion without disclosing account existence.
+        if (User::query()->where('email', $verification->email)->exists()) {
+            throw ApiException::forField('invalid_token', 'verification_token', __('auth.invalid_token'));
+        }
+
         // Create the user with the verified email
-        $user = User::create([
-            'first_name' => $request->first_name,
-            'last_name' => $request->last_name,
-            'email' => $verification->email,
-            'password' => $request->password,
-            'country_id' => $request->country_id,
-            'language_id' => $request->language_id,
-        ]);
+        try {
+            $user = User::create([
+                'first_name' => $request->first_name,
+                'last_name' => $request->last_name,
+                'email' => $verification->email,
+                'password' => $request->password,
+                'country_id' => $request->country_id,
+                'language_id' => $request->language_id,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            // Race: another request registered the same email first.
+            throw ApiException::forField('invalid_token', 'verification_token', __('auth.invalid_token'));
+        }
 
         $user->markEmailAsVerified();
 

@@ -47,6 +47,19 @@ test('it blocks login if a pending email verification is required', function () 
         ]);
 });
 
+test('it does not reveal pending email status when the password is incorrect', function () {
+    $this->user->update(['pending_email' => 'alice.new@example.com']);
+
+    $response = $this->postJson('/api/v2/auth/login', [
+        'email' => 'alice@example.com',
+        'password' => 'WrongPassword',
+    ]);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('code', 'credentials_invalid')
+        ->assertJsonMissingPath('pending_email');
+});
+
 test('it validates credentials and sends 2FA OTP with challenge token', function () {
     Notification::fake();
 

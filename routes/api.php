@@ -55,7 +55,7 @@ Route::prefix('v2/auth')->group(function () {
         // User Profile & Account Management
         Route::get('/me', [ProfileController::class, 'me']);
         Route::put('/profile', [ProfileController::class, 'update']);
-        Route::post('/profile/verify-email', [ProfileController::class, 'verifyEmail']);
+        Route::post('/profile/verify-email', [ProfileController::class, 'verifyEmail'])->middleware('throttle:otp-verify');
         Route::put('/password', [ProfileController::class, 'changePassword'])->middleware('throttle:sensitive');
         Route::delete('/account', [ProfileController::class, 'destroy'])->middleware('throttle:sensitive');
 

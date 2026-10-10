@@ -75,7 +75,7 @@ test('register flow responses match the documented shapes', function () {
     $complete->assertCreated()
         ->assertJsonStructure([
             'message', 'access_token', 'refresh_token', 'token_type',
-            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'email'],
+            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'full_name', 'email', 'pending_email', 'email_verified_at', 'language_id', 'language', 'country_id', 'country', 'created_at', 'updated_at'],
         ])
         ->assertJsonPath('message', 'Your account has been registered successfully.')
         ->assertJsonPath('expires_in', 86400)
@@ -103,7 +103,7 @@ test('login and refresh flow responses match the documented shapes', function ()
     $tokens = $verify->assertOk()
         ->assertJsonStructure([
             'message', 'access_token', 'refresh_token', 'token_type',
-            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'email'],
+            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'full_name', 'email', 'pending_email', 'email_verified_at', 'language_id', 'language', 'country_id', 'country', 'created_at', 'updated_at'],
         ])
         ->assertJsonPath('message', 'Logged in successfully.')
         ->assertJsonPath('expires_in', 86400)
@@ -115,7 +115,7 @@ test('login and refresh flow responses match the documented shapes', function ()
     $refresh->assertOk()
         ->assertJsonStructure([
             'message', 'access_token', 'refresh_token', 'token_type',
-            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'email'],
+            'expires_in', 'refresh_expires_in', 'user' => ['id', 'first_name', 'last_name', 'full_name', 'email', 'pending_email', 'email_verified_at', 'language_id', 'language', 'country_id', 'country', 'created_at', 'updated_at'],
         ])
         ->assertJsonPath('message', 'Token refreshed successfully.')
         ->assertJsonPath('expires_in', 86400);
@@ -126,30 +126,199 @@ test('locale and countries responses match the documented shapes', function () {
     $locale->assertOk()
         ->assertJsonStructure([
             'language' => ['id', 'code', 'name', 'source'],
-            'country' => ['id', 'code', 'name', 'phone_code', 'is_active', 'source'],
+            'country' => ['id', 'code', 'name', 'native_name', 'phone_code', 'is_active', 'source', 'language'],
             'country_selection_required',
             'preferences' => ['language_id', 'country_id'],
-            'supported_languages',
-            'countries',
+            'supported_languages' => [['id', 'code', 'name']],
+            'countries' => [['id', 'code', 'name', 'native_name', 'phone_code', 'language']],
         ]);
+
+    // Anonymous with a single active country: the country is inherited.
+    $locale->assertJsonPath('country.code', 'BF')
+        ->assertJsonPath('country.source', 'single_active')
+        ->assertJsonPath('country_selection_required', false)
+        ->assertJsonPath('preferences.language_id', null)
+        ->assertJsonPath('preferences.country_id', null);
+
+    // Only supported languages are listed (Arabic removed).
+    expect(collect($locale->json('supported_languages'))->pluck('code')->all())
+        ->toBe(['fr', 'en']);
 
     $countries = $this->getJson('/api/v2/countries/active');
     $countries->assertOk()
         ->assertJsonStructure(['country_selection_required', 'countries']);
 });
 
-test('devices listing matches the documented shape', function () {
+test('anonymous locale example with multiple active countries requires a selection', function () {
+    Country::where('code', 'SN')->update(['is_active' => true]);
+
+    $response = $this->getJson('/api/v2/locale');
+
+    $response->assertOk()
+        ->assertJsonPath('country', null)
+        ->assertJsonPath('country_selection_required', true)
+        ->assertJsonPath('preferences.country_id', null);
+
+    expect($response->json('language'))->not->toBeNull();
+});
+
+test('authenticated locale example resolves the profile preferences', function () {
     $user = makeUser();
     $token = $user->createToken('Sample Device')->plainTextToken;
 
     $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/v2/locale');
+
+    $response->assertOk()
+        ->assertJsonPath('language.source', 'profile')
+        ->assertJsonPath('country.source', 'profile')
+        ->assertJsonPath('country_selection_required', false)
+        ->assertJsonPath('preferences.language_id', $user->language_id)
+        ->assertJsonPath('preferences.country_id', $user->country_id);
+});
+
+test('authenticated locale example with an inactive profile country requires a selection', function () {
+    $inactive = Country::where('is_active', false)->firstOrFail();
+    $user = makeUser(['country_id' => $inactive->id]);
+    $token = $user->createToken('Sample Device')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->getJson('/api/v2/locale');
+
+    $response->assertOk()
+        ->assertJsonPath('country.id', $inactive->id)
+        ->assertJsonPath('country.is_active', false)
+        ->assertJsonPath('country.source', 'profile')
+        ->assertJsonPath('country_selection_required', true)
+        ->assertJsonPath('preferences.country_id', $inactive->id);
+});
+
+test('locale preferences update matches the documented shape', function () {
+    $user = makeUser();
+    $country = Country::where('is_active', true)->firstOrFail();
+    $language = Language::where('code', 'fr')->firstOrFail();
+    $token = $user->createToken('Sample Device')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->patchJson('/api/v2/locale', [
+            'language_id' => $language->id,
+            'country_id' => $country->id,
+        ]);
+
+    $response->assertOk()
+        ->assertJsonStructure([
+            'message',
+            'locale' => ['language', 'country', 'country_selection_required', 'preferences', 'supported_languages', 'countries'],
+            'user' => ['id', 'full_name', 'language_id', 'language', 'country_id', 'country'],
+        ])
+        ->assertJsonPath('locale.language.source', 'profile')
+        ->assertJsonPath('locale.country.id', $country->id)
+        ->assertJsonPath('locale.preferences.language_id', $language->id)
+        ->assertJsonPath('locale.preferences.country_id', $country->id)
+        ->assertJsonPath('user.id', $user->id);
+});
+
+test('password change matches the documented shape', function () {
+    $user = makeUser();
+    $token = $user->createToken('Sample Device')->plainTextToken;
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->putJson('/api/v2/auth/password', [
+            'current_password' => 'Password123!',
+            'password' => 'NewPassword123!',
+            'password_confirmation' => 'NewPassword123!',
+        ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['message', 'other_sessions_revoked'])
+        ->assertJsonPath('other_sessions_revoked', 0);
+});
+
+test('devices listing matches the documented shape', function () {
+    $user = makeUser();
+    $token = $user->createToken('Sample Device')->plainTextToken;
+    $user->refreshTokens()->create([
+        'token' => Str::random(64),
+        'device_name' => 'Sample Device',
+        'expires_at' => now()->addDays(30),
+        'revoked' => false,
+        'family_id' => (string) Str::uuid(),
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
         ->getJson('/api/v2/auth/devices');
 
-    $response->assertOk()->assertJsonStructure(['devices']);
+    $response->assertOk()
+        ->assertJsonStructure(['devices' => [['id', 'name', 'is_current', 'last_used_at', 'created_at']]]);
+});
 
-    if ($devices = $response->json('devices')) {
-        expect($devices[0])->toHaveKeys(['id', 'name', 'is_current', 'created_at']);
-    }
+test('disconnecting other devices matches the documented shape', function () {
+    $user = makeUser();
+    $token = $user->createToken('Current Device')->plainTextToken;
+    $user->tokens()->create([
+        'name' => 'Other Device',
+        'token' => hash('sha256', Str::random(40)),
+        'abilities' => ['*'],
+    ]);
+    $user->refreshTokens()->create([
+        'token' => Str::random(64),
+        'device_name' => 'Other Device',
+        'expires_at' => now()->addDays(30),
+        'revoked' => false,
+        'family_id' => (string) Str::uuid(),
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->deleteJson('/api/v2/auth/devices');
+
+    $response->assertOk()
+        ->assertJsonStructure(['message', 'revoked_count'])
+        ->assertJsonPath('revoked_count', 1);
+});
+
+test('disconnecting a device by id matches the documented shape', function () {
+    $user = makeUser();
+    $token = $user->createToken('Current Device')->plainTextToken;
+    $familyId = (string) Str::uuid();
+    $refreshToken = $user->refreshTokens()->create([
+        'token' => Str::random(64),
+        'device_name' => 'Other Device',
+        'expires_at' => now()->addDays(30),
+        'revoked' => false,
+        'family_id' => $familyId,
+    ]);
+    $user->tokens()->create([
+        'name' => $refreshToken->device_name,
+        'token' => hash('sha256', Str::random(40)),
+        'abilities' => ['*'],
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->deleteJson('/api/v2/auth/devices/'.$familyId);
+
+    $response->assertOk()
+        ->assertJsonStructure(['message'])
+        ->assertJsonMissingPath('current_device_revoked');
+});
+
+test('disconnecting the current device by id flags the revoked current session', function () {
+    $user = makeUser();
+    $token = $user->createToken('Current Device')->plainTextToken;
+    $familyId = (string) Str::uuid();
+    $user->refreshTokens()->create([
+        'token' => Str::random(64),
+        'device_name' => 'Current Device',
+        'expires_at' => now()->addDays(30),
+        'revoked' => false,
+        'family_id' => $familyId,
+    ]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$token)
+        ->deleteJson('/api/v2/auth/devices/'.$familyId);
+
+    $response->assertOk()
+        ->assertJsonStructure(['message', 'current_device_revoked'])
+        ->assertJsonPath('current_device_revoked', true);
 });
 
 test('error responses match the documented shapes', function () {

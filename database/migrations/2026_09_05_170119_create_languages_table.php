@@ -13,12 +13,12 @@ return new class extends Migration
     {
         Schema::create('languages', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 10)->unique();          // ISO 639-1 : fr, en, ar
+            $table->string('code', 10)->unique();          // ISO 639-1 : fr, en
             $table->string('name');                         // Nom en anglais : French
-            $table->string('native_name');                  // Nom local : Français, العربية
+            $table->string('native_name');                  // Nom local : Français, English
             $table->string('flag', 10)->nullable();         // Emoji drapeau : 🇫🇷
-            $table->string('locale', 10)->unique();         // fr_FR, en_US, ar_SA
-            $table->string('carbon_locale', 10)             // fr, en, ar (pour Carbon plus tard)
+            $table->string('locale', 10)->unique();         // fr_FR, en_US
+            $table->string('carbon_locale', 10)             // fr, en (pour Carbon plus tard)
                 ->nullable();
             $table->enum('direction', ['ltr', 'rtl'])       // Sens d'écriture
                 ->default('ltr');

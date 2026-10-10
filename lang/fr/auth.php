@@ -22,6 +22,7 @@ return [
     'otp_max_attempts' => 'Nombre maximal de tentatives dépassé. Veuillez demander un nouveau code.',
     'otp_wait_resend' => 'Veuillez patienter :seconds secondes avant de demander un nouveau code.',
     'invalid_token' => 'Le jeton de vérification est invalide ou a expiré.',
+    'verification_code_confirmed' => 'Code de vérification confirmé.',
 
     // Inscription
     'registration_completed' => 'Votre compte a été enregistré avec succès.',
@@ -63,6 +64,12 @@ return [
         'body' => 'Votre code de vérification est :',
         'expiry' => 'Ce code expirera dans :minutes minutes.',
         'warning' => 'Si vous n\'avez pas initié cette demande, aucune action n\'est requise.',
+        'existing_account' => [
+            'subject' => 'Un compte existe déjà',
+            'body' => 'Un compte est déjà enregistré avec cette adresse email.',
+            'login_hint' => 'S\'il s\'agit de votre compte, connectez-vous directement.',
+            'recovery_hint' => 'Si vous avez oublié votre mot de passe, utilisez le processus de réinitialisation.',
+        ],
     ],
 
 ];

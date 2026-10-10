@@ -4,6 +4,7 @@ use App\Models\Country;
 use App\Models\Language;
 use App\Models\User;
 use App\Models\VerificationCode;
+use App\Notifications\ExistingAccountNotification;
 use App\Notifications\SendOtpNotification;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Support\Facades\Notification;
@@ -35,25 +36,86 @@ test('it can send an OTP code for registration', function () {
     });
 });
 
-test('it rejects registration code request if email already exists', function () {
-    $language = Language::first();
-    $country = Country::first();
+test('registration code endpoints do not disclose whether an account exists', function (string $endpoint) {
+    config(['auth_api.rate_limits.otp_send.per_minute' => 10]);
 
-    User::create([
-        'first_name' => 'Existing',
-        'last_name' => 'User',
-        'email' => 'existing@example.com',
-        'password' => 'secret123',
-        'language_id' => $language->id,
-        'country_id' => $country->id,
+    $email = 'existing@example.com';
+    $existingUser = User::factory()->create(['email' => $email]);
+
+    Notification::fake();
+
+    $existingResponse = $this->postJson($endpoint, ['email' => $email]);
+    $existingResponse->assertOk()
+        ->assertJsonStructure(['message', 'email', 'expires_in', 'resend_available_in']);
+    $this->assertDatabaseMissing('verification_codes', [
+        'email' => $email,
+        'type' => VerificationCode::TYPE_REGISTER,
     ]);
 
-    $response = $this->postJson('/api/v2/auth/register/send-code', [
-        'email' => 'existing@example.com',
+    $existingUser->forceDelete();
+
+    $newResponse = $this->postJson($endpoint, ['email' => $email]);
+    $newResponse->assertOk();
+
+    expect($existingResponse->json())->toBe($newResponse->json());
+
+    $this->assertDatabaseHas('verification_codes', [
+        'email' => $email,
+        'type' => VerificationCode::TYPE_REGISTER,
     ]);
 
-    $response->assertStatus(422)
+    Notification::assertSentOnDemand(ExistingAccountNotification::class, function ($notification, $channels, $notifiable) use ($email) {
+        return $notifiable->routes['mail'] === $email;
+    });
+    Notification::assertSentOnDemand(SendOtpNotification::class, function ($notification, $channels, $notifiable) use ($email) {
+        return $notifiable->routes['mail'] === $email;
+    });
+})->with([
+    'send-code' => '/api/v2/auth/register/send-code',
+    'resend-code' => '/api/v2/auth/register/resend-code',
+]);
+
+test('registration code endpoints retain format validation', function (string $endpoint) {
+    $this->postJson($endpoint, [])
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'validation_failed')
         ->assertJsonValidationErrors(['email']);
+
+    $this->postJson($endpoint, ['email' => 'not-an-email'])
+        ->assertUnprocessable()
+        ->assertJsonPath('code', 'validation_failed')
+        ->assertJsonValidationErrors(['email']);
+})->with([
+    'send-code' => '/api/v2/auth/register/send-code',
+    'resend-code' => '/api/v2/auth/register/resend-code',
+]);
+
+test('registration completion returns invalid_token when the email is already taken', function () {
+    $email = 'taken@example.com';
+    User::factory()->create(['email' => $email]);
+
+    VerificationCode::create([
+        'email' => $email,
+        'code' => '123456',
+        'type' => VerificationCode::TYPE_REGISTER,
+        'token' => 'verified-registration-token',
+        'verified_at' => now(),
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $response = $this->postJson('/api/v2/auth/register/complete', [
+        'verification_token' => 'verified-registration-token',
+        'first_name' => 'New',
+        'last_name' => 'User',
+        'password' => 'Password123!',
+        'password_confirmation' => 'Password123!',
+    ]);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('code', 'invalid_token')
+        ->assertJsonPath('errors.verification_token.0', 'The verification token is invalid or has expired.');
+
+    expect(User::where('email', $email)->count())->toBe(1);
 });
 
 test('it can verify registration OTP code and receive a verification token', function () {
