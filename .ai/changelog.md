@@ -1,3 +1,14 @@
+## [2026-10-09] — Réécriture du guide de l'API v2 et validation automatisée (Tâche 03)
+- Création du guide complet d'intégration et de recette manuelle pour les développeurs front/mobile dans `docs/api/guide_api_v2.md`.
+- Couverture exhaustive des 25 endpoints sous `/api/v2` avec exécution réelle, payloads exacts et format standardisé.
+- Documentation autonome du système de locale et pays (règle d'or, priorité à 5 niveaux, PATCH partiel et total, exemple TypeScript).
+- Spécification des flux d'authentification par diagrammes de séquence Mermaid (inscription, connexion 2FA, mot de passe oublié complet, refresh).
+- Explication des règles de gestion des tokens côté client avec exemple d'intercepteur TypeScript single-flight contre les pièges de rotation.
+- Archivage de l'ancien document `notes/test_auth_v2_final.md` dans `docs/api/archive/test_auth_v2_final.md`.
+- Ajout du test Feature automatisé `tests/Feature/Docs/ApiGuideCoversAllRoutesTest.php` validant la cohérence de la table de référence avec les routes réelles.
+- Correction ciblée de la gestion de `Retry-After` sur `ThrottleRequestsException` dans `bootstrap/app.php` et du hash dummy dans `LoginController.php`.
+Fichiers : `docs/api/guide_api_v2.md`, `docs/api/archive/test_auth_v2_final.md`, `tests/Feature/Docs/ApiGuideCoversAllRoutesTest.php`, `bootstrap/app.php`, `app/Http/Controllers/Api/V2/Auth/LoginController.php`, `.ai/changelog.md`
+
 ## [2026-10-09] — Cohérence, sécurité et prévisibilité de l'authentification (Tâche 02)
 - Configuration centralisée des durées et limites via `config/auth_api.php` avec variables d'environnement.
 - Ajout de `expires_in` et `refresh_expires_in` (en secondes) à toutes les réponses de token (register, login, refresh).

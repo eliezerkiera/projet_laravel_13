@@ -66,7 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Handle ThrottleRequestsException
         $exceptions->render(function (ThrottleRequestsException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
-                $retryAfter = $e->headers->get('Retry-After');
+                $retryAfter = $e->getHeaders()['Retry-After'] ?? null;
 
                 return response()->json([
                     'code' => 'too_many_requests',

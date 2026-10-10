@@ -36,7 +36,7 @@ class LoginController extends Controller
         if (! $passwordValid) {
             // Run hash check against dummy hash to equalize timing
             if (! $user) {
-                Hash::check($request->password, '$2y$12$dummy.hash.for.timing.equalization');
+                Hash::check($request->password, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
             }
 
             throw ValidationException::withMessages([
