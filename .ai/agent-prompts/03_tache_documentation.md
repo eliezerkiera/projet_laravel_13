@@ -1,17 +1,17 @@
 # 03 — Tâche : réécriture du guide de l'API v2 pour les développeurs front/mobile
 
-> **Avant de commencer, lis `.ai/agent-prompts/00_contexte_commun.md` en entier.** Les règles qui y figurent s'appliquent ici.
+> **Avant de commencer, lis `00_contexte_commun.md` en entier.** Les règles qui y figurent s'appliquent ici.
 
 ## Objectif
 
 Produire **un guide Markdown unique, fiable, complet et facile à suivre**, destiné à des **développeurs front web et mobile** qui intègrent l'API v2, et qui sert aussi de procédure de test manuel (Insomnia / Postman).
 
-**Prérequis :** les tâches 01, 02, 04 et 05 sont terminées, leurs tests passent, et `docs/api/audit_auth_v2.md` ainsi que `docs/api/openapi.yaml` existent.
+**Prérequis :** les tâches 01, 02, 04 et 05 sont terminées, leurs tests passent, et `docs/api/audit_auth_v2.md` ainsi que `openapi.yaml` (à la racine du projet) existent.
 
 **Entrées :**
 - l'ancien guide `test_auth_v2_final.md` (le fichier doit se trouver dans le dépôt, par exemple dans `docs/api/` ; s'il est absent, demande-le) ;
 - `docs/api/audit_auth_v2.md` ;
-- `docs/api/openapi.yaml` : la **référence machine** des endpoints (schémas, codes d'erreur, limites), déjà produite et corrigée ;
+- `openapi.yaml` (à la racine du projet) : la **référence machine** des endpoints (schémas, codes d'erreur, limites), déjà produite et corrigée ;
 - le **code réel** et `php artisan route:list --path=api/v2 --json`.
 
 **Sortie :**
@@ -37,7 +37,18 @@ Si `notes/auth_v2_summary.md` ou des collections Insomnia existent dans le dép�
 - L'**OpenAPI** est la référence exhaustive et outillable de chaque endpoint (schémas, énumération des `code`, limites). **Ne la recopie pas en entier** dans le guide.
 - Le **guide** apporte ce que l'OpenAPI ne dit pas : le parcours, les concepts, l'ordre des appels, la gestion des tokens côté client, les exemples d'intégration, les pièges, les tests manuels.
 - Les deux doivent rester **cohérents** : mêmes noms de champs, mêmes `code`, mêmes limites, mêmes durées. En cas d'écart constaté, corrige le bon des deux, et signale-le dans ton rapport.
-- Dans l'en-tête du guide, renvoie vers `docs/api/openapi.yaml` pour la référence complète. Les sections de flux ne montrent que les requêtes et réponses utiles à la compréhension (extraits **réels**, tokens tronqués).
+- Dans l'en-tête du guide, renvoie vers `openapi.yaml` (à la racine du projet) pour la référence complète. Les sections de flux ne montrent que les requêtes et réponses utiles à la compréhension (extraits **réels**, tokens tronqués).
+
+---
+
+## Étape 0 — Compléter l'OpenAPI (petits manques constatés à la revue)
+
+Avant de rédiger le guide, dans `openapi.yaml` (à la racine du projet), sans rien inventer (exemples issus d'exécutions réelles) :
+
+1. Ajoute un exemple nommé pour les codes d'erreur qui n'en ont aucun : `otp_expired`, `otp_max_attempts`, `refresh_token_expired`.
+2. `resource_not_found` figure dans l'énumération mais aucun endpoint ne le renvoie en exemple : vérifie le comportement réel d'une route inconnue sous `/api/v2/...` et décris-le avec un exemple dans la description générale de l'API (section sur les erreurs). Si ce code n'est jamais renvoyé, retire-le de l'énumération.
+3. Ajoute un exemple réel aux réponses `200` qui n'en ont pas : `register/send-code`, `register/resend-code`, `register/verify-code`, `login`, `login/resend-code`, `forgot-password/send-code`, `forgot-password/resend-code`, `forgot-password/verify-code`, `forgot-password/reset`, `verify-pending-email`, `GET /auth/me`, `PUT /auth/profile`, `profile/verify-email`, `DELETE /auth/account`, `POST /auth/logout`, `GET /countries/active`.
+4. Relance le linter (`npx --yes @redocly/cli lint openapi.yaml`) et le test de couverture routes/OpenAPI ; les deux doivent rester verts.
 
 ---
 
@@ -105,7 +116,7 @@ Pour chaque flux : **un diagramme Mermaid de séquence** (client / API / email),
 Tous les endpoints protégés de `routes/api.php`, y compris `PUT /profile` (il ne modifie plus la langue ni le pays : c'est le rôle exclusif de `PATCH /locale`), `profile/verify-email`, `verify-pending-email` (explique la différence avec `profile/verify-email` et quand l'utiliser), `PUT /password` (effet : autres appareils déconnectés), `DELETE /account` (mot de passe requis), `devices` (format, `is_current`, `id` stable), `logout` (ce qui est révoqué exactement).
 
 ### 7. Référence des endpoints
-**Un seul tableau** de tous les endpoints : méthode, chemin complet, auth requise, limiteur de débit, corps, code de succès, lien vers la section détaillée. Il doit correspondre exactement à `route:list` **et** aux chemins de `docs/api/openapi.yaml` (ajoute une colonne « OpenAPI » avec le tag de l'endpoint).
+**Un seul tableau** de tous les endpoints : méthode, chemin complet, auth requise, limiteur de débit, corps, code de succès, lien vers la section détaillée. Il doit correspondre exactement à `route:list` **et** aux chemins de `openapi.yaml` (à la racine du projet) (ajoute une colonne « OpenAPI » avec le tag de l'endpoint).
 
 ### 8. Limites de débit
 Tableau des limiteurs (valeurs réelles), comportement `429`, `Retry-After`, recommandation front (désactiver le bouton et afficher le compte à rebours).
@@ -173,6 +184,7 @@ Objectif : empêcher que le guide dérive du code.
 ## Définition de terminé
 
 - [ ] `docs/api/guide_api_v2.md` conforme à la structure imposée (sections 0 à 11), un seul sommaire, un seul modèle d'endpoint.
+- [ ] Étape 0 réalisée : tous les codes d'erreur et toutes les réponses `200` de l'OpenAPI ont un exemple réel ; linter et test de couverture verts.
 - [ ] Le guide est cohérent avec `openapi.yaml` (noms de champs, `code`, limites, durées) ; tout écart est corrigé et signalé.
 - [ ] Tous les endpoints de `route:list` documentés, avec requêtes/réponses **réellement exécutées**.
 - [ ] Les flux inscription, connexion, **forgot-password complet**, refresh et réutilisation ont chacun un diagramme Mermaid.
@@ -182,4 +194,4 @@ Objectif : empêcher que le guide dérive du code.
 - [ ] Chaînage automatique des tokens documenté (Insomnia et Postman).
 - [ ] Aucune mention `⚠️ À confirmer` non listée dans le rapport.
 - [ ] Ancien guide archivé ; test de cohérence documentation/routes en place et vert ; toute la suite de tests passe.
-- [ ] Rapport final au format du `.ai/agent-prompts/00_contexte_commun.md` §5, avec la liste des `⚠️ À confirmer` et des écarts constatés entre l'ancien guide et le code.
+- [ ] Rapport final au format du `00_contexte_commun.md` §5, avec la liste des `⚠️ À confirmer` et des écarts constatés entre l'ancien guide et le code.
