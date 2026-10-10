@@ -1,3 +1,16 @@
+## [2026-10-10] — Mise à jour du guide d'intégration API v2 (Tâche 03)
+- Alignement de `docs/api/guide_api_v2.md` sur l'API v2 réelle après les corrections C1–C10.
+- Codes d'erreur : catalogue réduit aux **14 codes réels** (`invalid_token` unifié, ajout de `pending_email_verification_required`, `password_current_incorrect`) ; `invalid_token`/`invalid_refresh_token`/`refresh_token_expired` documentés avec leurs messages exacts.
+- `login` : `403 pending_email_verification_required` (corps `email`/`pending_email`) et `422 credentials_invalid` ; `login/verify-code` scindé en `invalid_token` / `otp_invalid` / `otp_expired` / `otp_max_attempts`.
+- `forgot-password/reset` : champ `reset_token` (corps, table, diagramme, table de référence) ; `register/complete` : `invalid_token`.
+- `login/resend-code` : `challenge_token` obligatoire (repli `email` retiré).
+- `expires_in` access token corrigé à `86400` (en-têtes des flux login/refresh et note de rafraîchissement proactif).
+- `otp-verify` : limite corrigée à **5/min** (section limites et table de référence).
+- `PUT /auth/profile` : `country_id`/`language_id` retirés (renvoi vers `PATCH /api/v2/locale`).
+- `DELETE /account` : `422 password_current_incorrect`.
+- Chapitre 11 : ajout des changements cassants C1–C10 ; checklist §10.5 et parcours §10.4 corrigés (plus de prétendue anti-énumération sur `register/send-code` et `forgot-password/send-code`).
+Fichiers : `docs/api/guide_api_v2.md`, `.ai/changelog.md`
+
 ## [2026-10-10] — Corrections post-revue de l'auth v2 (C6, C8, C9, C10)
 - C6 : `GET /api/v2/locale` renvoie `language`/`country` à `null` quand rien n'est résolu (plus de `source: none`) ; `country_selection_required` documenté comme « au moins un pays actif et aucun pays actif résolu » ; OpenAPI alignée (`LocaleContext`/`User` nullable, `CountryDetail.source ∈ {profile, single_active}`).
 - C8 : `openapi.yaml` complétée et validée par Redocly (0 erreur, 0 avertissement). `components.headers` `Content-Language`/`Vary` référencés sur toutes les réponses (dont erreurs) ; énumération complète des `code` (14 valeurs) ; erreurs 4xx réelles documentées par endpoint avec exemples (dont le `403` de `login`) ; règles de `PATCH /locale` et ses 422 ; `AuthTokenResponse.message` remplacé par un exemple par endpoint (inscription/connexion/refresh) ; langues d'exemple limitées à fr/en ; valeurs figées `expires_in`/`refresh_expires_in` retirées de l'introduction. Composant `ValidationError` supprimé car devenu inutilisé après éclatement inline des 422.
