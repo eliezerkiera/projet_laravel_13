@@ -39,7 +39,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'code' => 'unauthenticated',
-                    'message' => 'Unauthenticated.',
+                    'message' => __('auth.unauthenticated'),
                 ], 401);
             }
         });
@@ -49,7 +49,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'code' => 'resource_not_found',
-                    'message' => 'Resource not found.',
+                    'message' => __('auth.resource_not_found'),
                 ], 404);
             }
         });
@@ -58,7 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
             if ($request->is('api/*') || $request->expectsJson()) {
                 return response()->json([
                     'code' => 'resource_not_found',
-                    'message' => 'Resource not found.',
+                    'message' => __('auth.resource_not_found'),
                 ], 404);
             }
         });
@@ -70,7 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 return response()->json([
                     'code' => 'too_many_requests',
-                    'message' => 'Too many attempts. Please try again later.',
+                    'message' => __('auth.too_many_requests'),
                     'retry_after' => $retryAfter ? (int) $retryAfter : null,
                 ], 429)->header('Retry-After', $retryAfter);
             }
@@ -79,10 +79,25 @@ return Application::configure(basePath: dirname(__DIR__))
         // Handle ValidationException
         $exceptions->render(function (ValidationException $e, Request $request) {
             if ($request->is('api/*') || $request->expectsJson()) {
+                $errors = $e->errors();
+
+                // The current-password rule maps to a stable business code so the
+                // front-end can distinguish it from generic form validation errors.
+                $isCurrentPasswordFailure = false;
+
+                foreach ($e->validator->failed() as $rules) {
+                    foreach ($rules as $rule => $parameters) {
+                        if (strtolower($rule) === 'currentpassword') {
+                            $isCurrentPasswordFailure = true;
+                            break 2;
+                        }
+                    }
+                }
+
                 return response()->json([
-                    'code' => 'validation_failed',
+                    'code' => $isCurrentPasswordFailure ? 'password_current_incorrect' : 'validation_failed',
                     'message' => $e->getMessage(),
-                    'errors' => $e->errors(),
+                    'errors' => $errors,
                 ], $e->status);
             }
         });

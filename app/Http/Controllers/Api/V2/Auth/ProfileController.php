@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2\Auth;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\ChangePasswordRequest;
 use App\Http\Requests\V2\DeleteAccountRequest;
@@ -40,12 +41,11 @@ class ProfileController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        // Update basic profile attributes
+        // Update basic profile attributes.
+        // Language and country are controlled exclusively through PATCH /api/v2/locale.
         $user->fill($request->safe()->only([
             'first_name',
             'last_name',
-            'country_id',
-            'language_id',
         ]));
 
         $emailChanged = false;
@@ -104,9 +104,7 @@ class ProfileController extends Controller
         $user = $request->user();
 
         if (! $user->pending_email) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.invalid_token')],
-            ]);
+            throw ApiException::forField('invalid_token', 'code', __('auth.invalid_token'));
         }
 
         // Verify the code against the pending email address
@@ -144,19 +142,13 @@ class ProfileController extends Controller
             'code' => ['required', 'string', 'size:6'],
         ]);
 
-        // Find user by either pending_email or email
+        // Find the user by the pending email only: it is the address that received the code.
         $user = User::query()
             ->where('pending_email', $request->email)
-            ->orWhere(function ($query) use ($request) {
-                $query->where('email', $request->email)
-                    ->whereNotNull('pending_email');
-            })
             ->first();
 
         if (! $user || ! $user->pending_email) {
-            throw ValidationException::withMessages([
-                'email' => [__('auth.invalid_token')],
-            ]);
+            throw ApiException::forField('invalid_token', 'email', __('auth.invalid_token'));
         }
 
         $verification = $otpService->verifyCode(
@@ -238,7 +230,7 @@ class ProfileController extends Controller
         $user->delete();
 
         return response()->json([
-            'message' => 'Your account has been deleted.',
+            'message' => __('auth.account_deleted'),
         ]);
     }
 }

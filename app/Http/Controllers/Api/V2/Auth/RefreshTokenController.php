@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api\V2\Auth;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\RefreshTokenRequest;
 use App\Http\Resources\V2\UserResource;
 use App\Models\RefreshToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class RefreshTokenController extends Controller
 {
@@ -16,30 +16,19 @@ class RefreshTokenController extends Controller
      * Refresh the access token using a valid refresh token.
      *
      *
-     * @throws ValidationException
+     * @throws ApiException
      */
     public function refresh(RefreshTokenRequest $request): JsonResponse
     {
         $refreshToken = RefreshToken::query()
             ->where('token', $request->refresh_token)
-            ->where('revoked', false)
             ->first();
 
         if (! $refreshToken) {
-            throw ValidationException::withMessages([
-                'refresh_token' => [__('auth.invalid_refresh_token')],
-            ]);
+            throw ApiException::forField('invalid_refresh_token', 'refresh_token', __('auth.invalid_refresh_token'));
         }
 
-        if ($refreshToken->isExpired()) {
-            $refreshToken->revoke('expired');
-
-            throw ValidationException::withMessages([
-                'refresh_token' => [__('auth.refresh_token_expired')],
-            ]);
-        }
-
-        // Check for reuse detection: if token was already rotated, revoke the family
+        // Reuse detection: a token that was already rotated must never be reused.
         if ($refreshToken->rotated_at !== null) {
             \Log::warning('refresh_token_reuse_detected', [
                 'user_id' => $refreshToken->user_id,
@@ -49,9 +38,17 @@ class RefreshTokenController extends Controller
             // Revoke the entire family
             $refreshToken->revokeFamily();
 
-            throw ValidationException::withMessages([
-                'refresh_token' => [__('auth.invalid_refresh_token')],
-            ]);
+            throw ApiException::forField('invalid_refresh_token', 'refresh_token', __('auth.invalid_refresh_token'));
+        }
+
+        if ($refreshToken->revoked) {
+            throw ApiException::forField('invalid_refresh_token', 'refresh_token', __('auth.invalid_refresh_token'));
+        }
+
+        if ($refreshToken->isExpired()) {
+            $refreshToken->revoke('expired');
+
+            throw ApiException::forField('refresh_token_expired', 'refresh_token', __('auth.refresh_token_expired'));
         }
 
         $user = $refreshToken->user;
@@ -65,9 +62,7 @@ class RefreshTokenController extends Controller
                 ->first();
 
             if (! $lockedToken || $lockedToken->revoked || $lockedToken->isExpired()) {
-                throw ValidationException::withMessages([
-                    'refresh_token' => [__('auth.invalid_refresh_token')],
-                ]);
+                throw ApiException::forField('invalid_refresh_token', 'refresh_token', __('auth.invalid_refresh_token'));
             }
 
             // Generate or inherit family_id
@@ -89,7 +84,7 @@ class RefreshTokenController extends Controller
 
             // Create new Sanctum access token with explicit expiration
             $deviceName = $lockedToken->device_name ?: 'Web/Mobile App';
-            $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 60);
+            $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 1440);
             $newAccessToken = $user->createToken(
                 $deviceName,
                 ['*'],

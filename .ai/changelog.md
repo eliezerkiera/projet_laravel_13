@@ -1,3 +1,22 @@
+## [2026-10-10] — Corrections post-revue de l'auth v2 (C6, C8, C9, C10)
+- C6 : `GET /api/v2/locale` renvoie `language`/`country` à `null` quand rien n'est résolu (plus de `source: none`) ; `country_selection_required` documenté comme « au moins un pays actif et aucun pays actif résolu » ; OpenAPI alignée (`LocaleContext`/`User` nullable, `CountryDetail.source ∈ {profile, single_active}`).
+- C8 : `openapi.yaml` complétée et validée par Redocly (0 erreur, 0 avertissement). `components.headers` `Content-Language`/`Vary` référencés sur toutes les réponses (dont erreurs) ; énumération complète des `code` (14 valeurs) ; erreurs 4xx réelles documentées par endpoint avec exemples (dont le `403` de `login`) ; règles de `PATCH /locale` et ses 422 ; `AuthTokenResponse.message` remplacé par un exemple par endpoint (inscription/connexion/refresh) ; langues d'exemple limitées à fr/en ; valeurs figées `expires_in`/`refresh_expires_in` retirées de l'introduction. Composant `ValidationError` supprimé car devenu inutilisé après éclatement inline des 422.
+- C8 (tests) : `OpenApiRoutesCoverageTest` (YAML vs `Route::getRoutes()` pour `api/v2`) et `OpenApiSamplesTest` (échantillonnage réel register/login+refresh/locale+countries/devices/422/429/401) verts.
+- C9 : `AuthAuditClosureTest` couvre la clôture de l'audit — recherche `verify-pending-email` limitée à `pending_email`, envoi des OTP différé (`afterResponse()`), suppression de compte (mot de passe requis + révocation access/refresh), réutilisation d'un refresh token tourné → révocation de la famille, `family_id` stable après refresh et sans doublon dans `GET /devices`. `AuthDeviceTest` réécrit (5/5).
+- C10 : `AuthLocalizationTest` vérifie que `X-Locale-Override: fr` renvoie les messages métier en français avec `Content-Language: fr` et `code` inchangé.
+Fichiers : `openapi.yaml`, `tests/Feature/Docs/{OpenApiRoutesCoverageTest,OpenApiSamplesTest}.php`, `tests/Feature/AuthAuditClosureTest.php`, `tests/Feature/AuthLocalizationTest.php`, `.ai/changelog.md`
+
+## [2026-10-10] — Corrections post-revue de l'auth v2 (C1–C5, C7)
+- C1 : exposition des codes d'erreur métier stables en `code` de premier niveau via `ApiException` (errors par champ) et handler `ValidationException` (`validation_failed` / `password_current_incorrect`) ; correction d'un bug latent `$this->status` jamais initialisé dans `ApiException`.
+- C2 : access token TTL par défaut maintenu à 1440 minutes (config, `.env.example`, fallbacks contrôleurs).
+- C3 : limiteur `otp-verify` ramené à 5/min (config, `.env.example`, `AppServiceProvider`, OpenAPI à suivre).
+- C4 : `forgot-password/reset` attend désormais `reset_token` (changement cassant).
+- C5 : `PUT /auth/profile` n'accepte plus `country_id` / `language_id` (changement cassant) ; `PATCH /locale` seul point d'écriture.
+- C7 : `login/resend-code` exige `challenge_token` (plus de repli par email).
+- C9 (partiel) : OTP envoyés en différé via `SendOtpEmail` (`afterResponse()`), recherche `verify-pending-email` limitée à `pending_email`, `AuthDeviceTest` réécrit sur le modèle refresh-token/family_id.
+- Tests : `AuthErrorCodesTest` (une assertion par ligne du catalogue C1), `AuthTokenExpirationTest` ; suite complète verte (63 tests, 401 assertions).
+Fichiers : `app/Exceptions/ApiException.php`, `bootstrap/app.php`, `app/Services/OtpService.php`, `app/Jobs/SendOtpEmail.php`, `config/auth_api.php`, `app/Providers/AppServiceProvider.php`, `app/Http/Controllers/Api/V2/Auth/*.php`, `app/Http/Requests/V2/*.php`, `tests/Feature/{AuthErrorCodesTest,AuthTokenExpirationTest,AuthDeviceTest,AuthForgotPasswordTest}.php`
+
 ## [2026-10-10] — Génération et validation de la spécification OpenAPI v2 (openapi.yaml)
 - Génération complète du document `openapi.yaml` (spécification OpenAPI 3.0.3) couvrant l'ensemble des 25 endpoints de l'API v2.
 - Structuration par tags : `Authentication`, `Profile`, `Devices`, `Locale`, `Countries`.

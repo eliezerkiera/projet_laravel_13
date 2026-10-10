@@ -10,6 +10,9 @@ return [
 
     'failed' => 'Ces identifiants ne correspondent pas à nos enregistrements.',
     'password' => 'Le mot de passe fourni est incorrect.',
+    'unauthenticated' => 'Non authentifié.',
+    'resource_not_found' => 'Ressource non trouvée.',
+    'too_many_requests' => 'Trop de tentatives. Veuillez réessayer plus tard.',
     'throttle' => 'Tentatives de connexion trop nombreuses. Veuillez réessayer dans :seconds secondes.',
 
     // OTP & Vérification

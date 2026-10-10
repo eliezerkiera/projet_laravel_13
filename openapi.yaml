@@ -16,9 +16,10 @@ info:
     recommandé sur toutes les requêtes pour forcer la langue souhaitée sans
     modifier le profil utilisateur.
 
-    - **Gestion des Tokens** : Access token Sanctum (`expires_in = 3600s`) +
-    Refresh token maison (`refresh_expires_in = 2592000s`) avec rotation
-    atomique et détection de réutilisation frauduleuse.
+    - **Gestion des Tokens** : Access token Sanctum (`expires_in`) + Refresh
+    token maison (`refresh_expires_in`) avec rotation atomique et détection de
+    réutilisation frauduleuse. Les durées exactes sont fournies dans chaque
+    réponse d'authentification.
 
     - **Format d'Erreur Unifié** : Toutes les erreurs 4xx retournent un code
     machine stable `code` (snake_case) et un message lisible `message`.
@@ -75,9 +76,25 @@ components:
       schema:
         type: string
         example: fr-FR,fr;q=0.9,en;q=0.8
+  headers:
+    ContentLanguage:
+      description: Code de langue de la réponse (Content-Language)
+      schema:
+        type: string
+        example: fr
+    Vary:
+      description: 'Directives de mise en cache (Vary: Accept-Language, X-Locale-Override, Authorization)'
+      schema:
+        type: string
+        example: 'Accept-Language, X-Locale-Override, Authorization'
   responses:
     UnauthorizedError:
       description: Authentification manquante, invalide ou expirée
+      headers:
+        Content-Language:
+          $ref: '#/components/headers/ContentLanguage'
+        Vary:
+          $ref: '#/components/headers/Vary'
       content:
         application/json:
           schema:
@@ -87,6 +104,11 @@ components:
             message: Unauthenticated.
     NotFoundError:
       description: Ressource ou session introuvable
+      headers:
+        Content-Language:
+          $ref: '#/components/headers/ContentLanguage'
+        Vary:
+          $ref: '#/components/headers/Vary'
       content:
         application/json:
           schema:
@@ -94,21 +116,13 @@ components:
           example:
             code: resource_not_found
             message: Resource not found.
-    ValidationError:
-      description: Données de formulaire ou de requête invalides
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ValidationErrorResponse'
-          example:
-            code: validation_failed
-            message: The email field is required.
-            errors:
-              email:
-                - The email field is required.
     TooManyRequestsError:
       description: Quota de requêtes dépassé (limiteur de débit)
       headers:
+        Content-Language:
+          $ref: '#/components/headers/ContentLanguage'
+        Vary:
+          $ref: '#/components/headers/Vary'
         Retry-After:
           schema:
             type: integer
@@ -131,6 +145,21 @@ components:
       properties:
         code:
           type: string
+          enum:
+            - unauthenticated
+            - resource_not_found
+            - too_many_requests
+            - validation_failed
+            - password_current_incorrect
+            - credentials_invalid
+            - pending_email_verification_required
+            - invalid_token
+            - otp_invalid
+            - otp_expired
+            - otp_max_attempts
+            - device_not_found
+            - invalid_refresh_token
+            - refresh_token_expired
           description: Identifiant machine stable de l'erreur en snake_case
           example: unauthenticated
         message:
@@ -146,6 +175,16 @@ components:
       properties:
         code:
           type: string
+          enum:
+            - validation_failed
+            - password_current_incorrect
+            - credentials_invalid
+            - invalid_token
+            - otp_invalid
+            - otp_expired
+            - otp_max_attempts
+            - invalid_refresh_token
+            - refresh_token_expired
           example: validation_failed
         message:
           type: string
@@ -169,6 +208,8 @@ components:
       properties:
         code:
           type: string
+          enum:
+            - too_many_requests
           example: too_many_requests
         message:
           type: string
@@ -279,7 +320,6 @@ components:
           enum:
             - profile
             - single_active
-            - none
           example: profile
         language:
           $ref: '#/components/schemas/Language'
@@ -322,12 +362,16 @@ components:
           nullable: true
           example: 1
         language:
-          $ref: '#/components/schemas/Language'
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/Language'
         country_id:
           type: integer
           nullable: true
           example: 1
         country:
+          nullable: true
           type: object
           properties:
             id:
@@ -366,7 +410,9 @@ components:
       properties:
         message:
           type: string
-          example: Logged in successfully.
+          description: >-
+            Message de succès propre à l'endpoint (inscription, connexion,
+            rafraîchissement)
         access_token:
           type: string
           description: Jeton d'accès Sanctum
@@ -380,8 +426,8 @@ components:
           example: Bearer
         expires_in:
           type: integer
-          description: Durée de validité de l'access token en secondes (3600 = 1h)
-          example: 3600
+          description: Durée de validité de l'access token en secondes (86400 = 24h = 1440 min)
+          example: 86400
         refresh_expires_in:
           type: integer
           description: Durée de validité du refresh token en secondes (2592000 = 30 jours)
@@ -427,14 +473,20 @@ components:
         - countries
       properties:
         language:
-          $ref: '#/components/schemas/LanguageWithSource'
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/LanguageWithSource'
         country:
-          $ref: '#/components/schemas/CountryDetail'
+          type: object
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CountryDetail'
         country_selection_required:
           type: boolean
           description: >-
-            Vaut true si plusieurs pays sont actifs et qu'aucun pays n'est
-            sélectionné
+            Vaut true quand au moins un pays est actif et qu'aucun pays actif
+            n'est résolu (aucun choix, ou pays du profil devenu inactif)
           example: false
         preferences:
           type: object
@@ -490,6 +542,11 @@ paths:
       responses:
         '200':
           description: Code de vérification envoyé avec succès
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -515,7 +572,22 @@ paths:
                     example: 60
                     description: Temps d'attente avant renvoi possible en secondes
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Données invalides (email requis, format ou déjà utilisé).
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: validation_failed
+                message: The email field is required.
+                errors:
+                  email:
+                    - The email field is required.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/register/resend-code:
@@ -550,6 +622,11 @@ paths:
       responses:
         '200':
           description: Nouveau code envoyé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -573,7 +650,22 @@ paths:
                     type: integer
                     example: 60
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Données invalides (email requis).
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: validation_failed
+                message: The email field is required.
+                errors:
+                  email:
+                    - The email field is required.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/register/verify-code:
@@ -587,7 +679,7 @@ paths:
         temporaire d'une durée de 15 minutes.
 
 
-        **Limite de débit :** `otp-verify` (10/min).
+        **Limite de débit :** `otp-verify` (5/min).
       security: []
       parameters:
         - $ref: '#/components/parameters/XLocaleOverride'
@@ -614,6 +706,11 @@ paths:
       responses:
         '200':
           description: Code vérifié et jeton émis
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -638,7 +735,23 @@ paths:
                     example: 900
                     description: Durée de vie du verification_token en secondes (15 min)
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Code OTP invalide, expiré ou nombre maximal de tentatives atteint. Codes possibles : otp_invalid, otp_expired, otp_max_attempts, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: otp_invalid
+                message: The verification code is invalid.
+                errors:
+                  code:
+                    - The verification code is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/register/complete:
@@ -653,7 +766,7 @@ paths:
         d'authentification.
 
 
-        **Limite de débit :** `otp-verify` (10/min).
+        **Limite de débit :** `otp-verify` (5/min).
       security: []
       parameters:
         - $ref: '#/components/parameters/XLocaleOverride'
@@ -706,12 +819,46 @@ paths:
       responses:
         '201':
           description: Compte créé et session démarrée
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokenResponse'
+              example:
+                message: Your account has been registered successfully.
+                access_token: 2|abc...
+                refresh_token: r9T5nvAXjazh79xbahsv6aQUD02Z4ylwvIAi908c72a1...
+                token_type: Bearer
+                expires_in: 86400
+                refresh_expires_in: 2592000
+                user:
+                  id: 1
+                  first_name: Alice
+                  last_name: Dupont
+                  full_name: Alice Dupont
+                  email: alice@example.com
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Jeton de vérification invalide ou expiré. Codes possibles : invalid_token, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: invalid_token
+                message: The verification token is invalid or has expired.
+                errors:
+                  verification_token:
+                    - The verification token is invalid or has expired.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/login:
@@ -750,6 +897,11 @@ paths:
       responses:
         '200':
           description: Identifiants validés, saisie 2FA requise
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -780,22 +932,60 @@ paths:
                     example: 60
         '403':
           description: Vérification de nouvel email en attente
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - code
+                  - message
+                  - email
+                  - pending_email
                 properties:
+                  code:
+                    type: string
+                    enum:
+                      - pending_email_verification_required
+                    example: pending_email_verification_required
                   message:
                     type: string
                     example: You must verify your new email address before logging in.
                   email:
                     type: string
+                    format: email
                     example: alice@example.com
                   pending_email:
                     type: string
-                    example: new@example.com
+                    format: email
+                    example: alice.new@example.com
+              example:
+                code: pending_email_verification_required
+                message: You must verify your new email address before logging in.
+                email: alice@example.com
+                pending_email: alice.new@example.com
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Identifiants invalides. Codes possibles : credentials_invalid, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: credentials_invalid
+                message: These credentials do not match our records.
+                errors:
+                  email:
+                    - These credentials do not match our records.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/login/resend-code:
@@ -820,17 +1010,20 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - challenge_token
               properties:
                 challenge_token:
                   type: string
                   example: c7a8b9e0f1...
-                email:
-                  type: string
-                  format: email
-                  example: alice@example.com
       responses:
         '200':
           description: Code 2FA renvoyé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -854,7 +1047,23 @@ paths:
                     type: integer
                     example: 60
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            challenge_token requis ou invalide. Codes possibles : invalid_token, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: invalid_token
+                message: The verification token is invalid or has expired.
+                errors:
+                  challenge_token:
+                    - The verification token is invalid or has expired.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/login/verify-code:
@@ -868,7 +1077,7 @@ paths:
         tokens d'accès et de rafraîchissement.
 
 
-        **Limite de débit :** `otp-verify` (10/min).
+        **Limite de débit :** `otp-verify` (5/min).
       security: []
       parameters:
         - $ref: '#/components/parameters/XLocaleOverride'
@@ -898,12 +1107,46 @@ paths:
       responses:
         '200':
           description: Connexion réussie
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokenResponse'
+              example:
+                message: Logged in successfully.
+                access_token: 2|abc...
+                refresh_token: r9T5nvAXjazh79xbahsv6aQUD02Z4ylwvIAi908c72a1...
+                token_type: Bearer
+                expires_in: 86400
+                refresh_expires_in: 2592000
+                user:
+                  id: 1
+                  first_name: Alice
+                  last_name: Dupont
+                  full_name: Alice Dupont
+                  email: alice@example.com
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            challenge_token invalide, code OTP invalide/expiré/tentatives. Codes possibles : invalid_token, otp_invalid, otp_expired, otp_max_attempts, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: otp_invalid
+                message: The verification code is invalid.
+                errors:
+                  code:
+                    - The verification code is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/send-code:
@@ -937,6 +1180,11 @@ paths:
       responses:
         '200':
           description: Demande prise en compte
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -962,7 +1210,22 @@ paths:
                     type: integer
                     example: 60
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Données invalides (email requis).
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: validation_failed
+                message: The email field is required.
+                errors:
+                  email:
+                    - The email field is required.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/resend-code:
@@ -995,6 +1258,11 @@ paths:
       responses:
         '200':
           description: Code renvoyé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1020,7 +1288,22 @@ paths:
                     type: integer
                     example: 60
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Données invalides (email requis).
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: validation_failed
+                message: The email field is required.
+                errors:
+                  email:
+                    - The email field is required.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/verify-code:
@@ -1034,7 +1317,7 @@ paths:
         de 15 minutes.
 
 
-        **Limite de débit :** `otp-verify` (10/min).
+        **Limite de débit :** `otp-verify` (5/min).
       security: []
       parameters:
         - $ref: '#/components/parameters/XLocaleOverride'
@@ -1061,6 +1344,11 @@ paths:
       responses:
         '200':
           description: Code validé, jeton de réinitialisation émis
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1086,7 +1374,23 @@ paths:
                     type: integer
                     example: 900
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Code OTP invalide, expiré ou nombre maximal de tentatives atteint. Codes possibles : otp_invalid, otp_expired, otp_max_attempts, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: otp_invalid
+                message: The verification code is invalid.
+                errors:
+                  code:
+                    - The verification code is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/reset:
@@ -1112,13 +1416,13 @@ paths:
             schema:
               type: object
               required:
-                - token
+                - reset_token
                 - password
                 - password_confirmation
               properties:
-                token:
+                reset_token:
                   type: string
-                  example: TzXHQwErQXBFn2imYnCQE5HNyMPcKPnsQAWK2gC2K8eMDvzD3c2swtirVDTuHai4
+                  example: FIb4ZndtXbk7Ss7cmJydENkvsTM9pQWFjl4EFE9a5MMOhmONQphFr79NiM9sRZUr
                 password:
                   type: string
                   minLength: 8
@@ -1130,6 +1434,11 @@ paths:
       responses:
         '200':
           description: Mot de passe réinitialisé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1141,7 +1450,23 @@ paths:
                     type: string
                     example: Your password has been reset successfully.
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            reset_token invalide ou expiré, ou données invalides. Codes possibles : invalid_token, otp_invalid, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: invalid_token
+                message: The verification token is invalid or has expired.
+                errors:
+                  reset_token:
+                    - The verification token is invalid or has expired.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/verify-pending-email:
@@ -1155,7 +1480,7 @@ paths:
         s'est déconnecté ou si sa session a expiré.
 
 
-        **Limite de débit :** `otp-verify` (10/min).
+        **Limite de débit :** `otp-verify` (5/min).
       security: []
       parameters:
         - $ref: '#/components/parameters/XLocaleOverride'
@@ -1182,6 +1507,11 @@ paths:
       responses:
         '200':
           description: Nouvelle adresse email confirmée et activée
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1193,7 +1523,23 @@ paths:
                     type: string
                     example: Email address verified and updated successfully.
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Aucun changement en attente pour cet email, code OTP invalide, expiré ou nombre maximal de tentatives atteint. Codes possibles : invalid_token, otp_invalid, otp_expired, otp_max_attempts, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: invalid_token
+                message: The verification token is invalid or has expired.
+                errors:
+                  email:
+                    - The verification token is invalid or has expired.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/refresh:
@@ -1230,12 +1576,46 @@ paths:
       responses:
         '200':
           description: Jetons rafraîchis
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokenResponse'
+              example:
+                message: Token refreshed successfully.
+                access_token: 3|def...
+                refresh_token: q2W8nzBYkbah80ycbivw7bRUE13Z5zmxWJBj019d83b2...
+                token_type: Bearer
+                expires_in: 86400
+                refresh_expires_in: 2592000
+                user:
+                  id: 1
+                  first_name: Alice
+                  last_name: Dupont
+                  full_name: Alice Dupont
+                  email: alice@example.com
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Refresh token invalide ou expiré. Codes possibles : invalid_refresh_token, refresh_token_expired.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: invalid_refresh_token
+                message: The refresh token is invalid.
+                errors:
+                  refresh_token:
+                    - The refresh token is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/me:
@@ -1256,6 +1636,11 @@ paths:
       responses:
         '200':
           description: Profil utilisateur
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1305,17 +1690,14 @@ paths:
                   type: string
                   format: email
                   example: alice.new@example.com
-                country_id:
-                  type: integer
-                  nullable: true
-                  example: 1
-                language_id:
-                  type: integer
-                  nullable: true
-                  example: 1
       responses:
         '200':
           description: Profil mis à jour
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1337,7 +1719,22 @@ paths:
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: Données invalides (prénom, nom, email unique).
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: validation_failed
+                message: The email has already been taken.
+                errors:
+                  email:
+                    - The email has already been taken.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/profile/verify-email:
@@ -1374,6 +1771,11 @@ paths:
       responses:
         '200':
           description: Nouvelle adresse confirmée et mise à jour
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1390,7 +1792,23 @@ paths:
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Aucun changement d'email en attente, ou code OTP invalide/expiré/tentatives. Codes possibles : invalid_token, otp_invalid, otp_expired, otp_max_attempts, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: otp_invalid
+                message: The verification code is invalid.
+                errors:
+                  code:
+                    - The verification code is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/password:
@@ -1435,6 +1853,11 @@ paths:
       responses:
         '200':
           description: Mot de passe changé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1452,7 +1875,23 @@ paths:
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Mot de passe actuel incorrect ou données invalides. Codes possibles : password_current_incorrect, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: password_current_incorrect
+                message: The password is incorrect.
+                errors:
+                  current_password:
+                    - The password is incorrect.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/account:
@@ -1487,6 +1926,11 @@ paths:
       responses:
         '200':
           description: Compte supprimé
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1500,7 +1944,23 @@ paths:
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Mot de passe manquant ou incorrect. Codes possibles : password_current_incorrect, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: password_current_incorrect
+                message: The password is incorrect.
+                errors:
+                  password:
+                    - The password is incorrect.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/logout:
@@ -1521,6 +1981,11 @@ paths:
       responses:
         '200':
           description: Déconnexion réussie
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1555,6 +2020,11 @@ paths:
       responses:
         '200':
           description: Liste des sessions
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1589,6 +2059,11 @@ paths:
       responses:
         '200':
           description: Autres appareils déconnectés
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1632,6 +2107,11 @@ paths:
       responses:
         '200':
           description: Appareil déconnecté
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1671,6 +2151,11 @@ paths:
       responses:
         '200':
           description: Contexte de locale résolu
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1684,7 +2169,23 @@ paths:
       summary: Mettre à jour les préférences de langue/pays
       description: >-
         Modifie les préférences de langue et/ou de pays enregistrées dans le
-        profil utilisateur.
+        profil utilisateur. C'est le seul point d'écriture des préférences
+        (retiré de `PUT /auth/profile`).
+
+
+        **Règles :**
+
+        - Au moins une des clés `language_id`, `country_id` ou `reset_to_auto`
+        doit être fournie.
+
+        - `reset_to_auto: true` est exclusif : il ne peut pas être combiné avec
+        `country_id` ou `language_id` non nuls.
+
+        - Un `null` explicite remet le champ correspondant en détection
+        automatique.
+
+        - Un pays (`country_id`) ou une langue (`language_id`) inactif est
+        refusé.
 
 
         **Limite de débit :** `auth-api` (60/min).
@@ -1699,26 +2200,36 @@ paths:
           application/json:
             schema:
               type: object
+              minProperties: 1
               properties:
                 language_id:
                   type: integer
                   nullable: true
                   example: 1
-                  description: ID de la langue ou null pour auto
+                  description: >-
+                    ID d'une langue active, ou null pour revenir à la détection
+                    automatique
                 country_id:
                   type: integer
                   nullable: true
                   example: 1
-                  description: ID du pays ou null pour auto
+                  description: >-
+                    ID d'un pays actif, ou null pour revenir à la détection
+                    automatique
                 reset_to_auto:
                   type: boolean
                   example: false
                   description: >-
-                    Réinitialise simultanément langue et pays en auto (interdit
-                    avec d'autres champs)
+                    Réinitialise simultanément langue et pays en détection
+                    automatique (interdit avec country_id/language_id non nuls)
       responses:
         '200':
           description: Préférences mises à jour
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:
@@ -1738,7 +2249,52 @@ paths:
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: >-
+            Règles violées ou valeurs invalides. Codes possibles :
+            validation_failed avec les erreurs `fields`, `reset_to_auto`,
+            `country_id` ou `language_id`.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              examples:
+                fields_required:
+                  summary: Aucune clé fournie
+                  value:
+                    code: validation_failed
+                    message: At least one of country_id, language_id or reset_to_auto must be provided.
+                    errors:
+                      fields:
+                        - At least one of country_id, language_id or reset_to_auto must be provided.
+                reset_to_auto_conflict:
+                  summary: reset_to_auto combiné à une autre clé
+                  value:
+                    code: validation_failed
+                    message: reset_to_auto cannot be combined with country_id or language_id.
+                    errors:
+                      reset_to_auto:
+                        - reset_to_auto cannot be combined with country_id or language_id.
+                country_not_available:
+                  summary: Pays inactif
+                  value:
+                    code: validation_failed
+                    message: The selected country is not available.
+                    errors:
+                      country_id:
+                        - The selected country is not available.
+                language_invalid:
+                  summary: Langue invalide ou inactive
+                  value:
+                    code: validation_failed
+                    message: The selected language is invalid.
+                    errors:
+                      language_id:
+                        - The selected language is invalid.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /countries/active:
@@ -1757,6 +2313,11 @@ paths:
       responses:
         '200':
           description: Liste des pays actifs
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
           content:
             application/json:
               schema:

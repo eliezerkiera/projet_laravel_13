@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Exceptions\ApiException;
+use App\Jobs\SendOtpEmail;
 use App\Models\User;
 use App\Models\VerificationCode;
-use App\Notifications\SendOtpNotification;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -94,11 +94,9 @@ class OtpService
             'expires_at' => now()->addMinutes($this->getExpirationMinutes()),
         ]);
 
-        // Send OTP notification via email (synchronously for now - requires queue setup for async)
-        $notifiable = $user ?? (object) ['email' => $email, 'first_name' => null];
-        Notification::route('mail', $email)->notify(
-            new SendOtpNotification($code, $type, $this->getExpirationMinutes())
-        );
+        // Send OTP notification via email, deferred until after the response is sent.
+        $minutes = $this->getExpirationMinutes();
+        SendOtpEmail::dispatch($email, $code, $type, $minutes)->afterResponse();
 
         return $verificationCode;
     }
@@ -122,29 +120,21 @@ class OtpService
             ->first();
 
         if (! $record) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_invalid')],
-            ]);
+            throw ApiException::forField('otp_invalid', 'code', __('auth.otp_invalid'));
         }
 
         if ($record->isExpired()) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_expired')],
-            ]);
+            throw ApiException::forField('otp_expired', 'code', __('auth.otp_expired'));
         }
 
         if ($record->attempts >= $this->getMaxAttempts()) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_max_attempts')],
-            ]);
+            throw ApiException::forField('otp_max_attempts', 'code', __('auth.otp_max_attempts'));
         }
 
         if (! hash_equals($record->code, trim($code))) {
             $record->increment('attempts');
 
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_invalid')],
-            ]);
+            throw ApiException::forField('otp_invalid', 'code', __('auth.otp_invalid'));
         }
 
         // Generate temporary verification token valid for subsequent action

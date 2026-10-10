@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2\Auth;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\RegisterCompleteRequest;
 use App\Http\Requests\V2\RegisterSendCodeRequest;
@@ -118,10 +119,7 @@ class RegisterController extends Controller
         );
 
         if (! $verification) {
-            return response()->json([
-                'code' => 'verification_token_invalid',
-                'message' => __('auth.invalid_token'),
-            ], 422);
+            throw ApiException::forField('invalid_token', 'verification_token', __('auth.invalid_token'));
         }
 
         // Create the user with the verified email
@@ -141,7 +139,7 @@ class RegisterController extends Controller
 
         // Issue Sanctum Personal Access Token with explicit expiration
         $deviceName = $request->device_name ?: 'Web/Mobile App';
-        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 60);
+        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 1440);
         $token = $user->createToken(
             $deviceName,
             ['*'],

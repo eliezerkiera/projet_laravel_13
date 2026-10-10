@@ -44,7 +44,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('auth-otp-verification', function (Request $request): Limit {
-            return Limit::perMinute(config('auth_api.rate_limits.otp_verify.per_minute', 10))
+            return Limit::perMinute(config('auth_api.rate_limits.otp_verify.per_minute', 5))
                 ->by('auth-otp-verification:'.$this->requestIdentifier($request));
         });
 
@@ -60,7 +60,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('otp-verify', function (Request $request): Limit {
-            return Limit::perMinute(config('auth_api.rate_limits.otp_verify.per_minute', 10))
+            return Limit::perMinute(config('auth_api.rate_limits.otp_verify.per_minute', 5))
                 ->by('otp-verify:'.$this->requestIdentifier($request));
         });
 

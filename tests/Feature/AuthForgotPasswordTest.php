@@ -86,7 +86,7 @@ test('it resets password using valid reset_token and revokes active tokens', fun
     ]);
 
     $response = $this->postJson('/api/v2/auth/forgot-password/reset', [
-        'token' => $resetToken,
+        'reset_token' => $resetToken,
         'password' => 'BrandNewPassword123!',
         'password_confirmation' => 'BrandNewPassword123!',
     ]);

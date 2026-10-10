@@ -223,6 +223,108 @@ class LocaleTest extends TestCase
     }
 
     /**
+     * Test GET /api/v2/locale - connected user without any preference,
+     * multiple active countries => country: null, selection required.
+     */
+    public function test_get_locale_connected_without_preference_multiple_active_countries(): void
+    {
+        $this->createFrenchLanguage();
+        $this->createEnglishLanguage();
+
+        $this->createBurkinaFaso();
+        $this->createFrance();
+
+        $user = User::factory()->create([
+            'language_id' => null,
+            'country_id' => null,
+        ]);
+
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this
+            ->withHeader('Authorization', "Bearer $token")
+            ->get('/api/v2/locale');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'country' => null,
+            'country_selection_required' => true,
+            'preferences' => [
+                'language_id' => null,
+                'country_id' => null,
+            ],
+        ]);
+    }
+
+    /**
+     * Test GET /api/v2/locale - connected user with an inactive profile country.
+     * The profile country is still exposed (is_active: false) and selection is required.
+     */
+    public function test_get_locale_connected_with_inactive_country(): void
+    {
+        $this->createFrenchLanguage();
+        $this->createEnglishLanguage();
+
+        $burkinaFaso = $this->createBurkinaFaso();
+        $this->createFrance();
+
+        $burkinaFaso->update(['is_active' => false]);
+
+        $user = User::factory()->create([
+            'language_id' => null,
+            'country_id' => $burkinaFaso->id,
+        ]);
+
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this
+            ->withHeader('Authorization', "Bearer $token")
+            ->get('/api/v2/locale');
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('country.id', $burkinaFaso->id);
+        $response->assertJsonPath('country.is_active', false);
+        $response->assertJsonPath('country.source', 'profile');
+        $response->assertJsonPath('country_selection_required', true);
+        $response->assertJsonPath('preferences.country_id', $burkinaFaso->id);
+    }
+
+    /**
+     * Test GET /api/v2/locale - language: null when no language can be resolved
+     * (no override, no profile, unsupported Accept-Language, no country language,
+     * and default locale not among the supported active languages).
+     */
+    public function test_get_locale_language_null_when_nothing_resolvable(): void
+    {
+        config(['app.locale' => 'de']);
+
+        $this->createFrenchLanguage();
+        $this->createEnglishLanguage();
+
+        $this->createBurkinaFaso();
+        $this->createFrance();
+
+        $user = User::factory()->create([
+            'language_id' => null,
+            'country_id' => null,
+        ]);
+
+        $token = $user->createToken('test')->plainTextToken;
+
+        $response = $this
+            ->withHeader('Authorization', "Bearer $token")
+            ->withHeader('Accept-Language', 'de')
+            ->get('/api/v2/locale');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'language' => null,
+            'country' => null,
+            'country_selection_required' => true,
+        ]);
+    }
+
+    /**
      * Test GET /api/v2/locale with Accept-Language header
      */
     public function test_get_locale_with_accept_language_header(): void

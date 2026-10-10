@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2\Auth;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\LoginRequest;
 use App\Http\Requests\V2\LoginVerifyCodeRequest;
@@ -14,7 +15,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
 {
@@ -22,7 +22,7 @@ class LoginController extends Controller
      * Authenticate user credentials and dispatch 2FA OTP code.
      *
      *
-     * @throws ValidationException
+     * @throws ApiException
      */
     public function login(LoginRequest $request, OtpService $otpService): JsonResponse
     {
@@ -39,15 +39,14 @@ class LoginController extends Controller
                 Hash::check($request->password, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
             }
 
-            throw ValidationException::withMessages([
-                'email' => [__('auth.failed')],
-            ]);
+            throw ApiException::forField('credentials_invalid', 'email', __('auth.failed'));
         }
 
         // Rule: Old email remains active, but if an email change was requested,
         // the user must verify the new email address before logging in.
         if ($user->pending_email !== null) {
             return response()->json([
+                'code' => 'pending_email_verification_required',
                 'message' => __('auth.pending_email_verification_required'),
                 'email' => $user->email,
                 'pending_email' => $user->pending_email,
@@ -80,36 +79,22 @@ class LoginController extends Controller
      * Resend 2FA login verification code.
      *
      *
-     * @throws ValidationException
+     * @throws ApiException
      */
     public function resendCode(Request $request, OtpService $otpService): JsonResponse
     {
         $request->validate([
-            'challenge_token' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
+            'challenge_token' => ['required', 'string'],
         ]);
 
-        $record = null;
-
-        if ($request->filled('challenge_token')) {
-            $record = VerificationCode::query()
-                ->where('token', $request->challenge_token)
-                ->where('type', VerificationCode::TYPE_LOGIN)
-                ->whereNull('verified_at')
-                ->first();
-        } elseif ($request->filled('email')) {
-            $record = VerificationCode::query()
-                ->where('email', $request->email)
-                ->where('type', VerificationCode::TYPE_LOGIN)
-                ->whereNull('verified_at')
-                ->latest('id')
-                ->first();
-        }
+        $record = VerificationCode::query()
+            ->where('token', $request->challenge_token)
+            ->where('type', VerificationCode::TYPE_LOGIN)
+            ->whereNull('verified_at')
+            ->first();
 
         if (! $record) {
-            throw ValidationException::withMessages([
-                'challenge_token' => [__('auth.invalid_token')],
-            ]);
+            throw ApiException::forField('invalid_token', 'challenge_token', __('auth.invalid_token'));
         }
 
         $user = $record->user ?? User::where('email', $record->email)->first();
@@ -137,7 +122,7 @@ class LoginController extends Controller
      * Verify 2FA OTP code and generate Sanctum access token.
      *
      *
-     * @throws ValidationException
+     * @throws ApiException
      */
     public function verifyCode(LoginVerifyCodeRequest $request, OtpService $otpService): JsonResponse
     {
@@ -148,29 +133,21 @@ class LoginController extends Controller
             ->first();
 
         if (! $record) {
-            throw ValidationException::withMessages([
-                'challenge_token' => [__('auth.invalid_token')],
-            ]);
+            throw ApiException::forField('invalid_token', 'challenge_token', __('auth.invalid_token'));
         }
 
         if ($record->isExpired()) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_expired')],
-            ]);
+            throw ApiException::forField('otp_expired', 'code', __('auth.otp_expired'));
         }
 
         if ($record->hasExceededAttempts()) {
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_max_attempts')],
-            ]);
+            throw ApiException::forField('otp_max_attempts', 'code', __('auth.otp_max_attempts'));
         }
 
         if (! hash_equals($record->code, trim($request->code))) {
             $record->increment('attempts');
 
-            throw ValidationException::withMessages([
-                'code' => [__('auth.otp_invalid')],
-            ]);
+            throw ApiException::forField('otp_invalid', 'code', __('auth.otp_invalid'));
         }
 
         $user = $record->user ?? User::where('email', $record->email)->firstOrFail();
@@ -180,7 +157,7 @@ class LoginController extends Controller
 
         // Issue Sanctum Personal Access Token with explicit expiration
         $deviceName = $request->device_name ?: 'Web/Mobile App';
-        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 60);
+        $accessTokenTtl = config('auth_api.access_token_ttl_minutes', 1440);
         $token = $user->createToken(
             $deviceName,
             ['*'],

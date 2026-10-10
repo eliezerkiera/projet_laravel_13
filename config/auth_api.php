@@ -19,7 +19,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'access_token_ttl_minutes' => env('AUTH_API_ACCESS_TOKEN_TTL_MINUTES', 60),
+    'access_token_ttl_minutes' => env('AUTH_API_ACCESS_TOKEN_TTL_MINUTES', 1440),
 
     'refresh_token_ttl_days' => env('AUTH_API_REFRESH_TOKEN_TTL_DAYS', 30),
 
@@ -59,7 +59,7 @@ return [
             'per_hour' => env('AUTH_API_RATE_OTP_SEND_PER_HOUR', 5),
         ],
         'otp_verify' => [
-            'per_minute' => env('AUTH_API_RATE_OTP_VERIFY_PER_MINUTE', 10),
+            'per_minute' => env('AUTH_API_RATE_OTP_VERIFY_PER_MINUTE', 5),
         ],
         'login' => [
             'per_minute' => env('AUTH_API_RATE_LOGIN_PER_MINUTE', 5),

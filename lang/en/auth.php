@@ -11,6 +11,9 @@ return [
     'failed' => 'These credentials do not match our records.',
     'password' => 'The provided password is incorrect.',
     'throttle' => 'Too many login attempts. Please try again in :seconds seconds.',
+    'unauthenticated' => 'Unauthenticated.',
+    'resource_not_found' => 'Resource not found.',
+    'too_many_requests' => 'Too many attempts. Please try again later.',
 
     // OTP & Verification
     'otp_sent' => 'A verification code has been sent to your email address.',

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V2\Auth;
 
+use App\Exceptions\ApiException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V2\ForgotPasswordSendCodeRequest;
 use App\Http\Requests\V2\ForgotPasswordVerifyCodeRequest;
@@ -96,25 +97,19 @@ class ForgotPasswordController extends Controller
     public function resetPassword(ResetPasswordRequest $request, OtpService $otpService): JsonResponse
     {
         $verification = $otpService->findValidByToken(
-            $request->token,
+            $request->reset_token,
             VerificationCode::TYPE_PASSWORD_RESET
         );
 
         if (! $verification) {
-            return response()->json([
-                'code' => 'reset_token_invalid',
-                'message' => __('auth.invalid_token'),
-            ], 422);
+            throw ApiException::forField('invalid_token', 'reset_token', __('auth.invalid_token'));
         }
 
         $user = User::where('email', $verification->email)->first();
 
         // Anti-enumeration: same response for non-existent email
         if (! $user) {
-            return response()->json([
-                'code' => 'otp_invalid',
-                'message' => __('auth.otp_invalid'),
-            ], 422);
+            throw ApiException::forField('otp_invalid', 'reset_token', __('auth.otp_invalid'));
         }
 
         // Update to new hashed password

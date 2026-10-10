@@ -25,8 +25,6 @@ class UpdateProfileRequest extends FormRequest
         return [
             'first_name' => ['sometimes', 'required', 'string', 'max:255'],
             'last_name' => ['sometimes', 'required', 'string', 'max:255'],
-            'country_id' => ['sometimes', 'required', 'integer', 'exists:countries,id'],
-            'language_id' => ['sometimes', 'required', 'integer', 'exists:languages,id'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255'],
         ];
     }
