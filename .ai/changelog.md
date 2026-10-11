@@ -1,3 +1,12 @@
+## [2026-10-10] — Finalisation de la spécification OpenAPI v2 (Tâche 03 - Étape 0)
+- Ajout des exemples manquants pour les codes d'erreur `otp_expired`, `otp_max_attempts` et `refresh_token_expired` dans `openapi.yaml`.
+- Conversion des exemples d'erreur 422 en tableaux d'exemples nommés (otp_invalid, otp_expired, otp_max_attempts, invalid_refresh_token, refresh_token_expired).
+- Validation OpenAPI avec Redocly CLI : 0 erreur, 0 avertissement.
+- Tests OpenApiSamplesTest et ApiGuideCoversAllRoutesTest verts (105 tests, 829 assertions).
+- Le guide `docs/api/guide_api_v2.md` existe déjà et respecte la structure imposée avec tous les flux documentés.
+- L'ancien guide est déjà archivé dans `docs/api/archive/test_auth_v2_final.md`.
+Fichiers : `openapi.yaml`, `.ai/changelog.md`
+
 ## [2026-10-10] — Alignement du guide API v2 sur les corrections résiduelles
 - Mise à jour de `docs/api/guide_api_v2.md` après la tâche 05 : réponses nominales d'inscription/récupération, traductions présentes, chaînage des tokens et cinq cas de résolution du pays.
 - Référence OpenAPI liée à son emplacement réel (`openapi.yaml` à la racine) ; ajout des tags OpenAPI à la table des 25 endpoints et correction des limiteurs de `profile/verify-email`.

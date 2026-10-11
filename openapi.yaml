@@ -744,12 +744,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                code: otp_invalid
-                message: The verification code is invalid.
-                errors:
-                  code:
-                    - The verification code is invalid.
+              examples:
+                otp_invalid:
+                  summary: Code OTP invalide
+                  value:
+                    code: otp_invalid
+                    message: The verification code is invalid.
+                    errors:
+                      code:
+                        - The verification code is invalid.
+                otp_expired:
+                  summary: Code OTP expiré
+                  value:
+                    code: otp_expired
+                    message: The verification code has expired.
+                    errors:
+                      code:
+                        - The verification code has expired.
+                otp_max_attempts:
+                  summary: Nombre maximal de tentatives atteint
+                  value:
+                    code: otp_max_attempts
+                    message: Too many verification attempts. Please request a new code.
+                    errors:
+                      code:
+                        - Too many verification attempts. Please request a new code.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/register/complete:
@@ -1171,12 +1190,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                code: otp_invalid
-                message: The verification code is invalid.
-                errors:
-                  code:
-                    - The verification code is invalid.
+              examples:
+                otp_invalid:
+                  summary: Code OTP invalide
+                  value:
+                    code: otp_invalid
+                    message: The verification code is invalid.
+                    errors:
+                      code:
+                        - The verification code is invalid.
+                otp_expired:
+                  summary: Code OTP expiré
+                  value:
+                    code: otp_expired
+                    message: The verification code has expired.
+                    errors:
+                      code:
+                        - The verification code has expired.
+                otp_max_attempts:
+                  summary: Nombre maximal de tentatives atteint
+                  value:
+                    code: otp_max_attempts
+                    message: Too many verification attempts. Please request a new code.
+                    errors:
+                      code:
+                        - Too many verification attempts. Please request a new code.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/send-code:
@@ -1415,12 +1453,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                code: otp_invalid
-                message: The verification code is invalid.
-                errors:
-                  code:
-                    - The verification code is invalid.
+              examples:
+                otp_invalid:
+                  summary: Code OTP invalide
+                  value:
+                    code: otp_invalid
+                    message: The verification code is invalid.
+                    errors:
+                      code:
+                        - The verification code is invalid.
+                otp_expired:
+                  summary: Code OTP expiré
+                  value:
+                    code: otp_expired
+                    message: The verification code has expired.
+                    errors:
+                      code:
+                        - The verification code has expired.
+                otp_max_attempts:
+                  summary: Nombre maximal de tentatives atteint
+                  value:
+                    code: otp_max_attempts
+                    message: Too many verification attempts. Please request a new code.
+                    errors:
+                      code:
+                        - Too many verification attempts. Please request a new code.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/forgot-password/reset:
@@ -1656,12 +1713,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                code: invalid_refresh_token
-                message: The refresh token is invalid.
-                errors:
-                  refresh_token:
-                    - The refresh token is invalid.
+              examples:
+                invalid_refresh_token:
+                  summary: Refresh token invalide
+                  value:
+                    code: invalid_refresh_token
+                    message: The refresh token is invalid.
+                    errors:
+                      refresh_token:
+                        - The refresh token is invalid.
+                refresh_token_expired:
+                  summary: Refresh token expiré
+                  value:
+                    code: refresh_token_expired
+                    message: The refresh token has expired. Please log in again.
+                    errors:
+                      refresh_token:
+                        - The refresh token has expired. Please log in again.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/me:
@@ -1849,12 +1917,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationErrorResponse'
-              example:
-                code: otp_invalid
-                message: The verification code is invalid.
-                errors:
-                  code:
-                    - The verification code is invalid.
+              examples:
+                otp_invalid:
+                  summary: Code OTP invalide
+                  value:
+                    code: otp_invalid
+                    message: The verification code is invalid.
+                    errors:
+                      code:
+                        - The verification code is invalid.
+                otp_expired:
+                  summary: Code OTP expiré
+                  value:
+                    code: otp_expired
+                    message: The verification code has expired.
+                    errors:
+                      code:
+                        - The verification code has expired.
+                otp_max_attempts:
+                  summary: Nombre maximal de tentatives atteint
+                  value:
+                    code: otp_max_attempts
+                    message: Too many verification attempts. Please request a new code.
+                    errors:
+                      code:
+                        - Too many verification attempts. Please request a new code.
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
   /auth/password:
