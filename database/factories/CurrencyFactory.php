@@ -65,4 +65,22 @@ class CurrencyFactory extends Factory
             'is_default' => false,
         ]);
     }
+
+    /**
+     * Create USD currency.
+     */
+    public function usd(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'code' => 'USD',
+            'name' => 'Dollar américain',
+            'symbol' => '$',
+            'symbol_position' => 'before',
+            'decimal_places' => 2,
+            'decimal_separator' => '.',
+            'thousands_separator' => ',',
+            'is_active' => true,
+            'is_default' => false,
+        ]);
+    }
 }

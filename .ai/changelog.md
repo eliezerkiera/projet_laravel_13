@@ -1,3 +1,9 @@
+## [2026-10-19] — Seeders languages / currencies / countries via factories
+- Remplacement du seed manuel dans `DatabaseSeeder` par des seeders dédiés qui s’appuient sur les factory states.
+- Ajout des états `usd()` et `ivoryCoast()` ; alignement de `france()` (inactif) et des fallbacks XOF/EUR sur les états nommés.
+- `php artisan migrate:fresh --seed` remplit XOF/EUR/USD, fr/en, BF/SN/CI/FR comme avant.
+Fichiers : `database/seeders/{Database,Currency,Language,Country}Seeder.php`, `database/factories/{Currency,Language,Country}Factory.php`, `tests/Feature/DatabaseSeederTest.php`
+
 ## [2026-10-19] — Stack Docker locale (PHP, MySQL, Vite)
 - Ajout d'un `Dockerfile` PHP 8.5 CLI avec extensions Laravel (pdo_mysql, mbstring, bcmath, zip, intl, gd, pcntl, opcache) et Composer 2.
 - Ajout de `docker-compose.yaml` : services `app` (artisan serve :8000), `mysql` 8.4 (DB `projet_laravel_13`, root sans mot de passe comme `.env.example`), et `node` (profil `frontend`, Vite :5173).

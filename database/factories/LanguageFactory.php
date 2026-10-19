@@ -45,6 +45,8 @@ class LanguageFactory extends Factory
             'carbon_locale' => 'fr',
             'direction' => 'ltr',
             'is_active' => true,
+            'is_default' => true,
+            'sort_order' => 1,
         ]);
     }
 
@@ -62,6 +64,8 @@ class LanguageFactory extends Factory
             'carbon_locale' => 'en',
             'direction' => 'ltr',
             'is_active' => true,
+            'is_default' => false,
+            'sort_order' => 2,
         ]);
     }
 

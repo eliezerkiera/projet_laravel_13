@@ -38,7 +38,7 @@ class CountryFactory extends Factory
     {
         return $this->state(function (array $attributes) {
             $french = Language::where('code', 'fr')->first() ?? Language::factory()->french()->create();
-            $xof = Currency::where('code', 'XOF')->first() ?? Currency::factory()->create(['code' => 'XOF']);
+            $xof = Currency::where('code', 'XOF')->first() ?? Currency::factory()->xof()->create();
 
             return [
                 'code' => 'BF',
@@ -54,13 +54,13 @@ class CountryFactory extends Factory
     }
 
     /**
-     * Create France.
+     * Create France (inactive in seed data).
      */
     public function france(): static
     {
         return $this->state(function (array $attributes) {
             $french = Language::where('code', 'fr')->first() ?? Language::factory()->french()->create();
-            $eur = Currency::where('code', 'EUR')->first() ?? Currency::factory()->create(['code' => 'EUR']);
+            $eur = Currency::where('code', 'EUR')->first() ?? Currency::factory()->eur()->create();
 
             return [
                 'code' => 'FR',
@@ -69,8 +69,8 @@ class CountryFactory extends Factory
                 'phone_code' => '+33',
                 'currency_id' => $eur->id,
                 'language_id' => $french->id,
-                'is_active' => true,
-                'sort_order' => 2,
+                'is_active' => false,
+                'sort_order' => 4,
             ];
         });
     }
@@ -82,13 +82,35 @@ class CountryFactory extends Factory
     {
         return $this->state(function (array $attributes) {
             $french = Language::where('code', 'fr')->first() ?? Language::factory()->french()->create();
-            $xof = Currency::where('code', 'XOF')->first() ?? Currency::factory()->create(['code' => 'XOF']);
+            $xof = Currency::where('code', 'XOF')->first() ?? Currency::factory()->xof()->create();
 
             return [
                 'code' => 'SN',
                 'name' => 'Senegal',
                 'native_name' => 'Sénégal',
                 'phone_code' => '+221',
+                'currency_id' => $xof->id,
+                'language_id' => $french->id,
+                'is_active' => false,
+                'sort_order' => 2,
+            ];
+        });
+    }
+
+    /**
+     * Create Ivory Coast (inactive).
+     */
+    public function ivoryCoast(): static
+    {
+        return $this->state(function (array $attributes) {
+            $french = Language::where('code', 'fr')->first() ?? Language::factory()->french()->create();
+            $xof = Currency::where('code', 'XOF')->first() ?? Currency::factory()->xof()->create();
+
+            return [
+                'code' => 'CI',
+                'name' => 'Ivory Coast',
+                'native_name' => "Côte d'Ivoire",
+                'phone_code' => '+225',
                 'currency_id' => $xof->id,
                 'language_id' => $french->id,
                 'is_active' => false,
