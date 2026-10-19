@@ -1,0 +1,69 @@
+# Local Docker stack for Laravel 13 + MySQL + optional Vite (Node).
+# Usage:
+#   docker compose up -d --build
+#   docker compose --profile frontend up -d
+# Set DB_HOST=mysql in .env when the app runs inside Compose.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projet_laravel_13_app
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - .:/var/www/html
+    env_file:
+      - .env
+    environment:
+      # Override host DB so the container talks to the MySQL service.
+      DB_HOST: mysql
+      DB_PORT: 3306
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - laravel
+
+  mysql:
+    image: mysql:8.4
+    container_name: projet_laravel_13_mysql
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-projet_laravel_13}
+      # Matches .env.example empty root password for local use.
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - laravel
+
+  # Optional Vite/Tailwind frontend: docker compose --profile frontend up
+  node:
+    image: node:22-alpine
+    container_name: projet_laravel_13_node
+    working_dir: /var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    volumes:
+      - .:/var/www/html
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    profiles:
+      - frontend
+    networks:
+      - laravel
+
+volumes:
+  mysql_data:
+
+networks:
+  laravel:
+    driver: bridge

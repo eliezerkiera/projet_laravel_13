@@ -1,3 +1,10 @@
+## [2026-10-19] — Stack Docker locale (PHP, MySQL, Vite)
+- Ajout d'un `Dockerfile` PHP 8.5 CLI avec extensions Laravel (pdo_mysql, mbstring, bcmath, zip, intl, gd, pcntl, opcache) et Composer 2.
+- Ajout de `docker-compose.yaml` : services `app` (artisan serve :8000), `mysql` 8.4 (DB `projet_laravel_13`, root sans mot de passe comme `.env.example`), et `node` (profil `frontend`, Vite :5173).
+- Ajout de `.dockerignore` pour accélérer les builds.
+- Pour Docker : définir `DB_HOST=mysql` dans `.env` (déjà forcé côté service `app`).
+Fichiers : `Dockerfile`, `docker-compose.yaml`, `.dockerignore`, `.ai/changelog.md`
+
 ## [2026-10-10] — Finalisation de la spécification OpenAPI v2 (Tâche 03 - Étape 0)
 - Ajout des exemples manquants pour les codes d'erreur `otp_expired`, `otp_max_attempts` et `refresh_token_expired` dans `openapi.yaml`.
 - Conversion des exemples d'erreur 422 en tableaux d'exemples nommés (otp_invalid, otp_expired, otp_max_attempts, invalid_refresh_token, refresh_token_expired).
