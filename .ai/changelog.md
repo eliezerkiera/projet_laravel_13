@@ -1,3 +1,9 @@
+## [2026-10-22] — Route API smoke test `/api/v2/test`
+- Ajout d'un endpoint public `GET /api/v2/test` qui renvoie `{"status":"ok"}` pour vérifier que le serveur répond.
+- Documentation OpenAPI (tag `System`) et entrée dans le guide API v2 (26 routes).
+- Test Pest de couverture de la réponse.
+Fichiers : `routes/api.php`, `openapi.yaml`, `docs/api/guide_api_v2.md`, `tests/Feature/Api/V2/TestRouteTest.php`
+
 ## [2026-10-19] — Seeders languages / currencies / countries via factories
 - Remplacement du seed manuel dans `DatabaseSeeder` par des seeders dédiés qui s’appuient sur les factory states.
 - Ajout des états `usd()` et `ivoryCoast()` ; alignement de `france()` (inactif) et des fallbacks XOF/EUR sur les états nommés.

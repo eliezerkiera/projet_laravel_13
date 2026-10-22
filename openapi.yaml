@@ -50,6 +50,8 @@ tags:
       utilisateur
   - name: Countries
     description: Liste des pays actifs disponibles pour sélection
+  - name: System
+    description: Endpoints utilitaires (smoke test / disponibilité du serveur)
 components:
   securitySchemes:
     BearerAuth:
@@ -2723,4 +2725,30 @@ paths:
                       $ref: '#/components/schemas/Country'
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
+
+  /test:
+    get:
+      tags:
+        - System
+      operationId: getServerTest
+      summary: Vérifier que le serveur API répond
+      description: >-
+        Endpoint public de smoke test. Retourne un JSON minimal pour confirmer
+        que le serveur est joignable.
+      security: []
+      responses:
+        '200':
+          description: Serveur opérationnel
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    example: ok
+              example:
+                status: ok
 

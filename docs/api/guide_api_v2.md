@@ -5,7 +5,7 @@
 > **Destinataires :** Développeurs Front-end (Web React/Vue/Angular), Mobile (React Native/Flutter/iOS/Android), QA & Testeurs d'API.  
 > **Comment utiliser ce guide :**  
 > - **Intégration rapide :** Lisez les sections 1, 2, 3 et 5 pour appréhender les concepts clés, le flux de langue/pays et la gestion des tokens.  
-> - **Référence des endpoints :** Consultez les sections 4, 6 et 7 pour les signatures exactes des 25 endpoints de l'API.  
+> - **Référence des endpoints :** Consultez les sections 4, 6 et 7 pour les signatures exactes des 26 endpoints de l'API.  
 > - **Recette & Tests manuels :** Utilisez la section 10 pour configurer Insomnia ou Postman avec chaînage automatique et exécuter la checklist de validation.
 > - **Référence complète :** Consultez la [spécification OpenAPI v2](../../openapi.yaml) pour les schémas, les codes d'erreur et les réponses détaillées.
 
@@ -1704,10 +1704,11 @@ Authorization: Bearer 2|abc...
 
 ## 7. Référence des endpoints
 
-Tableau complet des 25 routes de l'API v2 (conforme à `php artisan route:list`) :
+Tableau complet des 26 routes de l'API v2 (conforme à `php artisan route:list`) :
 
 | Méthode | Chemin complet | Auth requise | Limiteur | Corps | Code succès | Section détaillée | OpenAPI |
 |---|---|---|---|---|---|---|---|
+| `GET` | `/api/v2/test` | Publique | Aucune | Aucun | `200 OK` | — | `System` |
 | `POST` | `/api/v2/auth/register/send-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) | `Authentication` |
 | `POST` | `/api/v2/auth/register/resend-code` | Publique | `otp-send` (1/min, 5/h) | JSON (`email`) | `200 OK` | [4.4 Renvoi de code](#44-renvoi-de-code-otp) | `Authentication` |
 | `POST` | `/api/v2/auth/register/verify-code` | Publique | `otp-verify` (5/min) | JSON (`email`, `code`) | `200 OK` | [4.1 Inscription](#41-inscription-en-3-étapes-otp) | `Authentication` |
