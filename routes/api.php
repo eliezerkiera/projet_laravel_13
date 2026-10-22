@@ -70,7 +70,6 @@ Route::prefix('v2/auth')->group(function () {
 Route::prefix('v2')->group(function () {
     // Public smoke-test endpoint (server reachability)
     Route::get('/test', function () {
-        dd('kdkdkkkd');
         return response()->json([
             'status' => 'ok',
         ]);

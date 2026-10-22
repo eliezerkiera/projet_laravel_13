@@ -1,3 +1,4 @@
 # Travail a faire
 
-- je veux que tu ajoutes une route API de test pour voir si le serveur fonctionne.
+- lorsque je lance une requete API par exemple `api/v2/test` j'obtien une message d'erreur 404 `ressource_not_found`
+- peux tu me dire a quoi est du ce probleme et comment le resoudre
