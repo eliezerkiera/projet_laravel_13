@@ -1,89 +1,62 @@
 # Contexte
 
-J'ai une API Laravel (uniquement API, pas de vues Blade) avec un système d'authentification complet déjà en place, basé sur **Laravel Sanctum en mode tokens personnels** (`personal_access_tokens`). L'API est **versionnée : je travaille sur la v2**. Je veux ajouter la connexion / inscription via Google avec Laravel Socialite, sans casser l'existant.
+J'ai un fichier `openapi.yaml` a la racine du projet qui décrit mon API Laravel v2 (authentification via Laravel Sanctum, tokens Bearer). Je dois pouvoir **l'importer sans erreur dans Insomnia** (File > Import) et obtenir une collection de requêtes exploitable. Actuellement, l'import échoue ou produit un résultat incomplet.
 
-# Étape 0 : Analyse obligatoire AVANT d'écrire du code
+# Objectif
 
-Explore le projet et résume-moi en quelques lignes ce que tu trouves :
-1. La version de Laravel et de PHP (composer.json), et la version de Sanctum.
-2. Comment la v2 est organisée : fichier de routes (`routes/api.php` avec groupe `prefix('v2')` ou fichier dédié), namespace des contrôleurs (ex. `App\Http\Controllers\Api\V2`), FormRequests, Resources, services, middlewares et tests de la v2.
-3. Comment le login v2 actuel génère le token Sanctum : nom du token, abilities, expiration (`config/sanctum.php`), révocation des anciens tokens, `device_name` éventuel, et le format exact de la réponse JSON (clés, structure, code HTTP).
-4. Le modèle User (fillable, hidden, casts, trait `HasApiTokens`) et les migrations de la table users (le champ password est-il nullable ? email_verified_at ?).
-5. Les conventions du projet (structure des dossiers, nommage, services/actions, Pest ou PHPUnit).
+Analyser le fichier, détecter toutes les erreurs (syntaxe YAML, non-conformité à la spécification OpenAPI, problèmes de compatibilité avec Insomnia), les corriger, puis me prouver que le fichier est valide.
 
-Réutilise ces conventions. Ne réinvente rien : le token renvoyé après connexion Google doit être créé de la même façon que celui du login v2 (même méthode `createToken`, mêmes abilities, même expiration, même format de réponse JSON).
+# Étape 0 : Diagnostic obligatoire AVANT toute modification
 
-# Périmètre de version
+1. Identifie la version de la spec utilisée (`openapi: 3.0.x`, `3.1.x` ou `swagger: 2.0`) et vérifie qu'elle est cohérente avec la syntaxe réellement employée dans le fichier (par exemple, `nullable` est du 3.0, tandis que `type: [string, "null"]` est du 3.1 ; les deux ne doivent pas être mélangés).
+2. Valide le fichier avec un outil, dans cet ordre de préférence, selon ce qui est disponible (sans modifier les dépendances du projet Laravel, utilise `npx` ou une installation temporaire hors projet) :
+   - `npx @redocly/cli lint openapi.yaml`
+   - `npx @stoplight/spectral-cli lint openapi.yaml`
+   - à défaut, un parseur YAML + validation manuelle de la structure
+3. Si les outils ne sont pas utilisables (pas de réseau, etc.), dis-le explicitement et fais une analyse manuelle rigoureuse en le signalant dans le rapport.
+4. Présente-moi la liste des problèmes trouvés, classés par gravité (bloquant pour l'import / non conforme à la spec / warning de qualité), AVANT de corriger.
 
-- Tout le code nouveau vit dans la **v2** uniquement : routes, contrôleurs, FormRequests, Resources, tests.
-- Ne modifie rien dans la v1.
-- Si la logique métier (service) peut être partagée entre versions, place-la dans un emplacement neutre (ex. `App\Services\Auth`) plutôt que dans un namespace V2.
+# Points de contrôle spécifiques
 
-# Objectif fonctionnel
+**Syntaxe YAML**
+- Indentation, tabulations, guillemets manquants (valeurs contenant `:`, `#`, `{`, `*`, `@`), clés dupliquées, ancres/alias invalides.
+- Valeurs ambiguës mal typées (par exemple `yes`, `no`, `on`, `null`, des numéros de version comme `2.0` qui doivent être des strings).
 
-Implémenter l'authentification Google en mode **stateless** (aucune session, aucun cookie, pas de mode SPA cookie Sanctum) avec deux flux :
+**Structure OpenAPI**
+- Champs racine obligatoires : `openapi`, `info` (avec `title` et `version`), `paths`.
+- Chaque opération a un `responses` non vide, avec au moins une réponse et une `description` sur chacune.
+- `operationId` unique dans tout le fichier.
+- Paramètres de chemin (`{id}`) : déclarés dans `parameters` avec `in: path` et `required: true`, et présents dans l'URL.
+- Pas de `requestBody` sur GET/DELETE/HEAD.
+- Tous les `$ref` pointent vers des composants existants (`#/components/schemas/...`, etc.), sans références circulaires bloquantes ni références orphelines cassées.
+- Schémas valides : types corrects, `items` obligatoire pour `type: array`, `required` ne listant que des propriétés existantes, `enum` cohérent avec le `type`, `example` conforme au schéma.
+- Content types corrects (`application/json`, `multipart/form-data`, etc.) et exemples bien formés.
 
-**Flux A : Redirection (web)**
-- `GET /api/v2/auth/google/redirect` : renvoie en JSON l'URL de redirection Google (`Socialite::driver('google')->stateless()->redirect()->getTargetUrl()`).
-- `GET /api/v2/auth/google/callback` : reçoit le `code` de Google, récupère l'utilisateur via `->stateless()->user()`, puis connecte ou crée le compte et renvoie le token Sanctum en JSON.
+**Compatibilité Insomnia**
+- Un bloc `servers` valide avec une URL absolue (par exemple `http://localhost:8000/api/v2` ou une variable d'URL avec valeur par défaut), car Insomnia s'en sert pour construire la base URL de l'environnement.
+- `components.securitySchemes` déclare l'authentification Bearer de Sanctum (`type: http`, `scheme: bearer`), et `security` est appliqué globalement ou par opération, avec les routes publiques (login, register, Google auth) surchargées par `security: []`.
+- Les `tags` sont déclarés et utilisés de façon cohérente (Insomnia les utilise pour regrouper les requêtes en dossiers).
+- Chaque opération a un `summary` (Insomnia l'utilise comme nom de la requête).
+- Pas de fonctionnalités non supportées ou mal supportées à l'import : `$ref` vers des fichiers externes ou des URLs distantes (à résoudre en les inlinant ou en les ramenant dans `components`), `callbacks`/`webhooks` complexes (à signaler plutôt qu'à supprimer silencieusement).
 
-**Flux B : Token (SPA / mobile)**
-- `POST /api/v2/auth/google/token` : reçoit `{ "token": "<access_token Google>" }` (et `device_name` si mon login v2 l'utilise), valide-le côté serveur avec `Socialite::driver('google')->stateless()->userFromToken($token)`, puis connecte ou crée le compte et renvoie le token Sanctum.
+# Règles de correction
 
-Adapte les chemins exacts au préfixe et au nommage réellement utilisés par ma v2 (identifie-les à l'étape 0).
+- **Ne modifie jamais le contrat réel de l'API** : ne change ni les chemins, ni les méthodes HTTP, ni les noms de champs, ni les codes de réponse, sauf si c'est une erreur manifeste de frappe, que tu me signales alors explicitement.
+- Si une information manque et que tu ne peux pas la déduire du fichier (par exemple un schéma de réponse absent), ne l'invente pas : ajoute un schéma minimal et générique, et liste-le dans les points à vérifier. Tu peux t'appuyer sur mes routes et contrôleurs Laravel v2 pour confirmer un comportement, en lecture seule.
+- Corrections minimales : conserve l'ordre, les commentaires et le style existants autant que possible. Pas de réécriture complète du fichier.
+- Avant de modifier, crée une sauvegarde `openapi.yaml.bak`.
+- Garde le fichier en une seule pièce (pas de découpage en plusieurs fichiers).
 
-# Règles métier
+# Vérification finale
 
-- Crée une table `social_accounts` (migration) : `id`, `user_id` (FK, cascade on delete), `provider`, `provider_id`, `provider_email` nullable, timestamps, avec un index unique sur (`provider`, `provider_id`). Ajoute le modèle `SocialAccount` et la relation `socialAccounts()` sur User.
-- Logique de résolution de l'utilisateur, dans cet ordre :
-  1. Si un `social_account` existe pour (google, provider_id) : connecter l'utilisateur lié.
-  2. Sinon, si un User existe avec le même email : lier le compte Google à ce User (uniquement si l'email Google est vérifié, sinon refuser avec une erreur claire).
-  3. Sinon, créer un nouveau User (nom et email depuis Google, `email_verified_at` = now(), mot de passe nullable ou aléatoire selon ce qui est le plus cohérent avec mon schéma actuel) puis le lier.
-- Rends `password` nullable via une migration seulement si nécessaire, sans casser les données existantes.
-- Toute la logique métier va dans un service ou une action dédiée (ex. `GoogleAuthService`), pas dans le contrôleur. Le contrôleur reste fin.
-- Mets les opérations de création/liaison dans une transaction DB.
-- Le token Sanctum est créé après la transaction, avec la même logique que le login v2.
-
-# Configuration
-
-- Installe `laravel/socialite` via composer s'il n'est pas déjà présent.
-- Ajoute la config `google` dans `config/services.php` (client_id, client_secret, redirect) lue depuis `.env`.
-- Ajoute dans `.env.example` : `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (avec en exemple une URI cohérente avec la route v2 du callback). Ne mets jamais de vraies valeurs.
-- Utilise toujours `->stateless()`.
-
-# Sécurité et gestion d'erreurs
-
-- Valide l'entrée du flux B avec une FormRequest v2.
-- Gère les exceptions Socialite (token invalide, code expiré, `InvalidStateException`, erreurs Guzzle) et renvoie des réponses JSON propres (401 ou 422) au même format d'erreur que le reste de ma v2, sans fuite d'information interne.
-- Applique le même rate limiting (throttle) que mes routes d'auth v2 existantes.
-- Ne logge jamais de tokens ni de secrets.
-- Respecte les règles existantes au moment de la connexion (compte désactivé, vérification d'email, rôles, etc.).
-
-# Tests
-
-Écris des tests dans le dossier et le framework de tests de la v2, en mockant Socialite, sans jamais appeler Google pour de vrai :
-- Nouvel utilisateur : compte créé + social_account créé + token Sanctum renvoyé (vérifie la présence dans `personal_access_tokens` et que le token permet d'appeler une route protégée v2).
-- Utilisateur existant avec le même email : compte lié, pas de doublon.
-- Retour d'un utilisateur déjà lié : connexion directe.
-- Token Google invalide : réponse d'erreur 401/422.
-- Champ `token` manquant : erreur de validation.
-- Email Google non vérifié avec email déjà existant : refus.
-Lance toute la suite de tests et assure-toi que les tests existants (v1 et v2) passent toujours.
-
-# Contraintes
-
-- Ne modifie pas le comportement du login/register actuel, ni de la v1.
-- Fais des changements minimaux et cohérents avec le code existant, sans refactor non demandé.
-- N'ajoute aucune dépendance autre que `laravel/socialite`.
-- Respecte le style de code du projet (lance Pint / le linter s'il est configuré).
+1. Relance l'outil de validation et montre-moi que le résultat est sans erreur (les warnings restants doivent être listés et justifiés).
+2. Si possible, simule l'import : par exemple convertis le fichier avec un outil comme `openapi-to-postmanv2` (`npx openapi-to-postmanv2 -s openapi.yaml -o /tmp/out.json`) ou un parseur type `swagger-parser` pour confirmer que la spec se résout entièrement (tous les `$ref` inclus).
+3. Vérifie qu'aucun `$ref` n'est cassé et qu'aucun `operationId` n'est dupliqué.
 
 # Livrable final
 
-À la fin, donne-moi :
-1. La liste des fichiers créés et modifiés.
-2. Les commandes à exécuter (migrate, etc.).
-3. Les étapes de configuration côté Google Cloud Console (URI de redirection autorisée correspondant à la route v2, écran de consentement OAuth, type d'identifiants).
-4. Des exemples `curl` pour tester chaque endpoint v2, y compris un appel à une route protégée avec le token Sanctum obtenu.
-5. Les hypothèses que tu as dû faire et les points qui méritent ma vérification.
-6. Cree un fichier markdownd dans lequelle tu expliquera comment tester avec le logiciel Insomnia
-7. Mets a jours le fichier `openapi.yaml` pour integrer les nouvelles routes
+1. Le tableau des problèmes trouvés : localisation (ligne / chemin), gravité, correction appliquée.
+2. Le fichier `openapi.yaml` corrigé.
+3. Le résultat de la validation avant / après.
+4. Les hypothèses faites et les points qui nécessitent ma vérification.
+5. Les étapes pour l'importer dans Insomnia et configurer l'environnement (base URL, variable de token Bearer).
