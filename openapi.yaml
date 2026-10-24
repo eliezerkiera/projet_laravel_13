@@ -2725,6 +2725,166 @@ paths:
                       $ref: '#/components/schemas/Country'
         '429':
           $ref: '#/components/responses/TooManyRequestsError'
+  /auth/google/redirect:
+    get:
+      tags:
+        - Authentication
+      operationId: googleRedirect
+      summary: Redirection vers Google OAuth
+      description: >-
+        Retourne l'URL de redirection vers Google pour le flux OAuth. Utilisé pour
+        les applications web qui redirigent l'utilisateur vers la page de connexion
+        Google.
+
+
+        **Limite de débit :** `auth-api`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: URL de redirection générée
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - redirect_url
+                properties:
+                  redirect_url:
+                    type: string
+                    example: https://accounts.google.com/o/oauth2/v2/auth?client_id=...&redirect_uri=...
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/google/callback:
+    get:
+      tags:
+        - Authentication
+      operationId: googleCallback
+      summary: Callback Google OAuth
+      description: >-
+        Reçoit le code de Google après autorisation, authentifie l'utilisateur et
+        renvoie les jetons Sanctum. Utilisé pour le flux de redirection web.
+
+
+        **Comportement :**
+        - Si le compte Google n'existe pas : crée un nouvel utilisateur avec les
+        infos Google
+        - Si l'email existe déjà : lie le compte Google à l'utilisateur existant
+        - Si le compte Google est déjà lié : connecte directement
+
+
+        **Limite de débit :** `auth-api`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      responses:
+        '200':
+          description: Authentification réussie
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          description: Erreur Google OAuth (code invalide, expiré, email non vérifié). Codes possibles : google_auth_failed, google_email_not_verified.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: google_auth_failed
+                message: Google authentication failed.
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+  /auth/google/token:
+    post:
+      tags:
+        - Authentication
+      operationId: googleToken
+      summary: Authentification Google par token
+      description: >-
+        Authentifie l'utilisateur en utilisant un access token Google directement.
+        Utilisé pour les applications SPA/mobile qui gèrent le flux OAuth côté
+        client.
+
+
+        **Comportement :**
+        - Si le compte Google n'existe pas : crée un nouvel utilisateur avec les
+        infos Google
+        - Si l'email existe déjà : lie le compte Google à l'utilisateur existant
+        - Si le compte Google est déjà lié : connecte directement
+
+
+        **Limite de débit :** `auth-api`.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/XLocaleOverride'
+        - $ref: '#/components/parameters/AcceptLanguage'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Access token Google obtenu côté client
+                  example: ya29.a0AfH6SMB...
+                device_name:
+                  type: string
+                  description: Nom de l'appareil (optionnel)
+                  example: My iPhone
+      responses:
+        '200':
+          description: Authentification réussie
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          description: Token Google invalide ou email non vérifié. Codes possibles : google_token_invalid, google_email_not_verified, validation_failed.
+          headers:
+            Content-Language:
+              $ref: '#/components/headers/ContentLanguage'
+            Vary:
+              $ref: '#/components/headers/Vary'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                code: google_token_invalid
+                message: Google token is invalid.
+                errors:
+                  token:
+                    - The Google token is invalid.
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
 
   /test:
     get:

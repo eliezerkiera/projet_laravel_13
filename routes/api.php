@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V2\Auth\DeviceController;
 use App\Http\Controllers\Api\V2\Auth\ForgotPasswordController;
+use App\Http\Controllers\Api\V2\Auth\GoogleAuthController;
 use App\Http\Controllers\Api\V2\Auth\LoginController;
 use App\Http\Controllers\Api\V2\Auth\ProfileController;
 use App\Http\Controllers\Api\V2\Auth\RefreshTokenController;
@@ -46,6 +47,13 @@ Route::prefix('v2/auth')->group(function () {
 
         // Refresh Token (public endpoint - no auth required)
         Route::post('/refresh', [RefreshTokenController::class, 'refresh'])->middleware('throttle:refresh');
+
+        // -------------------------------------------------------------
+        // Google OAuth Authentication
+        // -------------------------------------------------------------
+        Route::get('/google/redirect', [GoogleAuthController::class, 'redirect']);
+        Route::get('/google/callback', [GoogleAuthController::class, 'callback']);
+        Route::post('/google/token', [GoogleAuthController::class, 'token']);
     });
 
     // -------------------------------------------------------------

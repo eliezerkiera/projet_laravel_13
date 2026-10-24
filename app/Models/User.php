@@ -86,6 +86,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the social accounts associated with this user.
+     */
+    public function socialAccounts(): HasMany
+    {
+        return $this->hasMany(SocialAccount::class);
+    }
+
+    /**
      * Get user's full name.
      */
     public function getFullNameAttribute(): string

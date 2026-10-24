@@ -1,3 +1,21 @@
+## [2026-10-23] — Implémentation de l'authentification Google OAuth (API v2)
+- Ajout de l'authentification Google via Laravel Socialite en mode stateless (pas de session, pas de cookie).
+- Deux flux OAuth : redirection web (`GET /auth/google/redirect` + `GET /auth/google/callback`) et token SPA/mobile (`POST /auth/google/token`).
+- Création de la table `social_accounts` avec relation FK cascade on delete vers `users` et index unique sur (provider, provider_id).
+- Migration pour rendre le champ `password` nullable dans `users` (nécessaire pour les comptes Google sans mot de passe).
+- Service `GoogleAuthService` avec logique métier en transaction DB : liaison si email existe, création si nouveau compte, rejet si email non vérifié.
+- Contrôleur `GoogleAuthController` v2 avec gestion des erreurs Socialite et création de tokens Sanctum identique au login v2.
+- FormRequest `GoogleTokenRequest` pour validation du flux token.
+- Configuration Google dans `config/services.php` et variables d'environnement dans `.env.example`.
+- Tests Pest complets avec mock Socialite : création utilisateur, liaison compte existant, compte déjà lié, email non vérifié, token invalide, device_name personnalisé, accès route protégée.
+- Mise à jour de `openapi.yaml` avec les 3 nouvelles routes Google et documentation complète.
+- Guide de test Insomnia (`GOOGLE_AUTH_INSOMNIA_GUIDE.md`) avec instructions Google Cloud Console, scénarios de test et exemples curl.
+- Rate limiting `auth-api` appliqué sur toutes les routes Google.
+- Nouveaux utilisateurs Google reçoivent `language_id` et `country_id` par défaut (Language::getDefault(), Country::getDefault()).
+- Relations : User `socialAccounts()` hasMany, SocialAccount `user()` belongsTo.
+Migrations : `2026_10_23_161730_create_social_accounts_table.php`, `2026_10_23_161751_make_password_nullable_in_users_table.php`
+Fichiers : `app/Services/Auth/GoogleAuthService.php`, `app/Http/Controllers/Api/V2/Auth/GoogleAuthController.php`, `app/Http/Requests/V2/GoogleTokenRequest.php`, `app/Models/SocialAccount.php`, `app/Models/User.php`, `routes/api.php`, `config/services.php`, `.env.example`, `tests/Feature/AuthGoogleTest.php`, `openapi.yaml`, `GOOGLE_AUTH_INSOMNIA_GUIDE.md`
+
 ## [2026-10-22] — Route API smoke test `/api/v2/test`
 - Ajout d'un endpoint public `GET /api/v2/test` qui renvoie `{"status":"ok"}` pour vérifier que le serveur répond.
 - Documentation OpenAPI (tag `System`) et entrée dans le guide API v2 (26 routes).
