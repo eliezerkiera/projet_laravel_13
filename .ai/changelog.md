@@ -1,3 +1,13 @@
+## [2026-10-24] — Correction des erreurs de syntaxe YAML et conformité OpenAPI
+- Correction de 2 erreurs de syntaxe YAML (lignes 2801 et 2870) : échappement des caractères `:` dans les descriptions de réponse Google OAuth.
+- Remplacement de l'URL relative `/api/v2` par `http://localhost:8000/api/v2` dans `servers` pour compatibilité Insomnia.
+- Ajout des codes d'erreur Google (`google_auth_failed`, `google_email_not_verified`, `google_token_invalid`) aux enums des schémas `ErrorResponse` et `ValidationErrorResponse`.
+- Correction de l'exemple de réponse 422 pour `/auth/google/callback` : ajout du champ `errors` requis.
+- Ajout d'une réponse 422 pour l'endpoint `/test` (best practice OpenAPI).
+- Validation Redocly CLI : 0 erreur, 1 warning (localhost dans server URL - acceptable pour développement).
+- Conversion réussie vers Postman via `openapi-to-postmanv2` pour simuler l'import.
+Fichiers : `openapi.yaml`, `openapi.yaml.bak`
+
 ## [2026-10-23] — Implémentation de l'authentification Google OAuth (API v2)
 - Ajout de l'authentification Google via Laravel Socialite en mode stateless (pas de session, pas de cookie).
 - Deux flux OAuth : redirection web (`GET /auth/google/redirect` + `GET /auth/google/callback`) et token SPA/mobile (`POST /auth/google/token`).
